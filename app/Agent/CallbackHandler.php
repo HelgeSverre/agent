@@ -1,6 +1,6 @@
 <?php
 
-namespace App;
+namespace App\Agent;
 
 use Closure;
 
@@ -24,7 +24,7 @@ class CallbackHandler
         }
     }
 
-    public function triggerThought(mixed $thought): void
+    public function triggerThought(Thought $thought): void
     {
         if ($this->onThought) {
             ($this->onThought)($thought);

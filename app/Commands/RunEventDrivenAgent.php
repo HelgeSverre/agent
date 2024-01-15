@@ -12,7 +12,7 @@ use Throwable;
 
 use function Laravel\Prompts\confirm;
 
-class RunAgent extends Command
+class RunEventDrivenAgent extends Command
 {
     protected $signature = 'run {task?}';
 

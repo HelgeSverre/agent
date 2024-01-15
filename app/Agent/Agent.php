@@ -1,6 +1,6 @@
 <?php
 
-namespace App;
+namespace App\Agent;
 
 use HelgeSverre\Brain\Facades\Brain;
 use Illuminate\Support\Arr;
@@ -9,7 +9,7 @@ class Agent
 {
     protected bool $isTaskCompleted = false;
 
-    protected array $history = [];
+    protected array $intermediateSteps = [];
 
     protected int $currentIteration = 0;
 
@@ -71,26 +71,18 @@ class Agent
 
         $response = Brain::json($prompt);
 
-        dump($response);
-
         return $response;
-
     }
 
     protected function think(string $task)
     {
-        $context = $this->prepareContext();
-        $tools = $this->prepareTools();
-
-        $prompt = [
+        $prompt = implode("\n\n", array_filter([
             $this->goal ? "GOAL: \n{$this->goal}" : '',
             "YOUR TASK: {$task}",
-            "AVAILABLE TOOLS (the action_input arguments are provided underneath the tool names, all of they must be provided ): \n{$tools}",
+            $this->prepareTools(),
             $this->prepareResponseFormatInstructions(),
-            $context ? "STEPS PERFORMED SO FAR: \n{$context}" : '',
-        ];
-
-        $prompt = implode("\n\n", array_filter($prompt));
+            $this->prepareContext(),
+        ]));
 
         $this->callbacks->triggerPrompt($prompt);
 
@@ -99,13 +91,20 @@ class Agent
 
     protected function updateHistory(string $type, mixed $content)
     {
-        $this->history[] = ['type' => $type, 'content' => $content];
+        $this->intermediateSteps[] = ['type' => $type, 'content' => $content];
     }
 
-    protected function prepareContext(): string
+    protected function prepareContext(): ?string
     {
         $context = [];
-        foreach ($this->history as $item) {
+
+        if (empty($this->intermediateSteps)) {
+            return null;
+        }
+
+        $context[] = "STEPS PERFORMED SO FAR: \n";
+
+        foreach ($this->intermediateSteps as $item) {
 
             if ($item['type'] === 'thought') {
                 $context[] = "Thought: {$item['content']}";
@@ -142,10 +141,10 @@ class Agent
         return [];
     }
 
-    protected function prepareTools(): string
+    protected function prepareTools(): ?string
     {
         if (count($this->tools) === 0) {
-            return 'none';
+            return null;
         }
 
         $toolInstructions = '';
@@ -162,7 +161,9 @@ class Agent
 
         }
 
-        return trim($toolInstructions);
+        $prefix = "AVAILABLE TOOLS (the action_input arguments are provided underneath the tool names, all of the arguments must be provided ): \n";
+
+        return $prefix.trim($toolInstructions);
     }
 
     protected function prepareResponseFormatInstructions(): string
