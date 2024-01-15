@@ -3,6 +3,8 @@
 namespace App\Tools;
 
 use App\Agent\Tool;
+use App\TextUtils;
+use Illuminate\Support\Facades\Http;
 
 class BrowseWebsiteTool implements Tool
 {
@@ -16,10 +18,21 @@ class BrowseWebsiteTool implements Tool
         return 'Get the contents of a website';
     }
 
+    public function run(array $args = [])
+    {
+
+    }
+
     public function execute(...$args): string
     {
-        // Implementation to get website contents
-        // Use $args to get 'url'
-        // Return website contents or result string
+        $response = Http::get($args['url']);
+
+        if ($response->failed()) {
+            return 'Could not retrieve website contents for url: ' . $args['url'] . ' - ' . $response->status() . ' - ' . $response->body();
+        }
+
+        $text = TextUtils::cleanHtml($response->body());
+
+        return "Website contents: \n\n{$text}";
     }
 }

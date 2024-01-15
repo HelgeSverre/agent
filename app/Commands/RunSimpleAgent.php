@@ -3,6 +3,7 @@
 namespace App\Commands;
 
 use App\Agent\Agent;
+use App\Agent\SimpleAgent;
 use App\Tools\ReadFileTool;
 use App\Tools\RunCommandTool;
 use App\Tools\SearchWebTool;
@@ -23,7 +24,7 @@ class RunSimpleAgent extends Command
 
         $this->comment("Task: \n" . wordwrap($task, 80));
 
-        $agent = new Agent(
+        $agent = new SimpleAgent(
             tools: [
                 new ReadFileTool(),
                 new WriteFileTool(),
@@ -31,7 +32,6 @@ class RunSimpleAgent extends Command
                 new RunCommandTool(),
             ],
             goal: 'Respond to the human as helpfully and accurately as possible. The human will ask you to do things, and you should do them.',
-
         );
 
         $finalResponse = $agent->run($task);
