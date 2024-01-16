@@ -2,33 +2,22 @@
 
 namespace App\Tools;
 
-use App\Agent\Tool;
+use App\Agent\Tool\Tool;
 use App\TextUtils;
 use Illuminate\Support\Facades\Http;
 
-class BrowseWebsiteTool implements Tool
+class BrowseWebsiteTool extends Tool
 {
-    public function name(): string
-    {
-        return 'browse_website';
-    }
+    protected string $name = 'Browse Website';
 
-    public function description(): string
-    {
-        return 'Get the contents of a website';
-    }
+    protected string $description = 'Get the contents of a website';
 
-    public function run(array $args = [])
+    public function run(string $url): string
     {
-
-    }
-
-    public function execute(...$args): string
-    {
-        $response = Http::get($args['url']);
+        $response = Http::get($url);
 
         if ($response->failed()) {
-            return 'Could not retrieve website contents for url: ' . $args['url'] . ' - ' . $response->status() . ' - ' . $response->body();
+            return sprintf('Could not retrieve website contents for url: %s - %s - %s', $url, $response->status(), $response->body());
         }
 
         $text = TextUtils::cleanHtml($response->body());

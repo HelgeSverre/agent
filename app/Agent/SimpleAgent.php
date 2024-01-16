@@ -2,6 +2,7 @@
 
 namespace App\Agent;
 
+use App\Agent\Tool\Tool;
 use HelgeSverre\Brain\Facades\Brain;
 use Illuminate\Support\Arr;
 

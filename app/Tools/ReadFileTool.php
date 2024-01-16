@@ -2,26 +2,18 @@
 
 namespace App\Tools;
 
-use App\Agent\Tool;
-
-class ReadFileTool implements Tool
+class ReadFileTool
 {
-    public function name(): string
-    {
-        return 'read_file';
-    }
+    protected string $name = 'read_file';
 
-    public function description(): string
-    {
-        return 'read a file from the local file system';
-    }
+    protected string $description = 'read a file from the local file system';
 
-    public function execute(...$args): string
+    public function run(string $fileName): string
     {
         if (file_exists('./output') === false) {
             mkdir('./output');
         }
 
-        return 'File contents: '.file_get_contents('./output/'.$args['file_name']);
+        return 'File contents: '.file_get_contents('./output/'.$fileName);
     }
 }

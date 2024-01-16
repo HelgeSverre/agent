@@ -2,7 +2,6 @@
 
 namespace App\Commands;
 
-use App\Agent\Agent;
 use App\Agent\SimpleAgent;
 use App\Tools\ReadFileTool;
 use App\Tools\RunCommandTool;
@@ -18,11 +17,11 @@ class RunSimpleAgent extends Command
     {
         $task = $this->argument('task');
 
-        if (!$task) {
+        if (! $task) {
             $task = $this->ask('What do you want to do?');
         }
 
-        $this->comment("Task: \n" . wordwrap($task, 80));
+        $this->comment("Task: \n".wordwrap($task, 80));
 
         $agent = new SimpleAgent(
             tools: [
@@ -39,6 +38,4 @@ class RunSimpleAgent extends Command
         $this->warn("Final response: {$finalResponse}");
 
     }
-
-
 }

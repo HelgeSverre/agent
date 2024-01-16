@@ -16,15 +16,15 @@ class SearchWebTool
         return 'search the web for a specific search term';
     }
 
-    public function execute(...$args): string
+    public function run(string $searchTerm, int $numResults = 5): string
     {
         /** @noinspection LaravelFunctionsInspection */
         $response = Http::withHeader('X-Subscription-Token', env('BRAVE_API_KEY'))
             ->acceptJson()
             ->asJson()
             ->get('https://api.search.brave.com/res/v1/web/search', [
-                'q' => $args['search_term'],
-                'count' => $args['num_results'],
+                'q' => $searchTerm,
+                'count' => $numResults,
             ]);
 
         if ($response->status() == 422) {
