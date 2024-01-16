@@ -42,7 +42,7 @@ class SimpleAgent
             dump($nextStep);
 
             $this->recordStep('thought', $nextStep['thought'] ?? '');
-            $this->recordStep('action', Arr::only($nextStep, ['action', 'action_input']));
+            $this->recordStep('action', Arr::only($nextStep ?? [], ['action', 'action_input']));
 
             if ($nextStep['action'] === 'final_answer') {
                 $this->isTaskCompleted = true;
@@ -56,21 +56,21 @@ class SimpleAgent
                 return $nextStep['action_input'];
             }
 
-            // TODO: call tool
-
             $observation = $this->executeTool($nextStep['action'], $nextStep['action_input']);
 
             $this->recordStep('observation', $observation);
         }
     }
 
-    protected function executeTool($action, $input): ?string
+    protected function executeTool($toolName, $toolInput): ?string
     {
 
         /** @var Tool $tool */
-        $tool = collect($this->tools)->first(fn (Tool $tool) => $tool->name() === $action);
+        $tool = collect($this->tools)->first(fn (Tool $tool) => $tool->name() === $toolName);
 
-        return $tool->execute($input);
+        // TODO: Handle exception
+
+        return $tool->execute($toolInput);
     }
 
     protected function checkIfDone(string $task)
@@ -84,6 +84,11 @@ class SimpleAgent
 
         $response = Brain::json($prompt);
 
+        // TODO: maybe it makes sense to return this data:
+        //   {"status": "completed", "feedback": "The task is completed !", "tasks": []}
+        //   or
+        //   {"status": "not completed", "feedback": "not all tasks have been completed", "tasks": ["task 1","task 2"]}
+
         return $response;
     }
 
@@ -95,6 +100,8 @@ class SimpleAgent
             tools: $this->tools,
             intermediateSteps: $this->intermediateSteps,
         )->decideNextStep();
+
+        // TODO: Parse, if parse failure, recover with LLM call, if total failure, throw exception
 
         return Brain::temperature(0.5)->slow()->json($prompt);
     }
