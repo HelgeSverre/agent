@@ -2,6 +2,11 @@
 
 namespace App\Agent;
 
+use App\Agent\Tool\Tool;
+
+/**
+ * @property-read Tool[]|array $tools
+ */
 class Prompt
 {
     public function __construct(
@@ -10,6 +15,7 @@ class Prompt
         protected ?array $tools = [],
         protected ?array $intermediateSteps = []
     ) {
+
     }
 
     public static function make(
@@ -63,14 +69,12 @@ class Prompt
 
         $toolInstructions = '';
 
-        foreach ($this->tools as $toolName => $tool) {
+        foreach ($this->tools as $tool) {
 
-            $toolInstructions .= "\n{$toolName}: {$tool['description']}\n";
+            $toolInstructions .= "\n{$tool->name()}: {$tool->description()}\n";
 
-            if (isset($tool['arguments']) && is_array($tool['arguments'])) {
-                foreach ($tool['arguments'] as $name => $arg) {
-                    $toolInstructions .= sprintf('- %s (%s): %s', $name, $arg['type'], $arg['description'])."\n";
-                }
+            foreach ($tool->arguments() as $arg) {
+                $toolInstructions .= sprintf('- %s (%s): %s', $arg->name, $arg->type, $arg->description ?? '')."\n";
             }
 
         }

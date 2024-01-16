@@ -2,7 +2,9 @@
 
 namespace App\Tools;
 
-class ReadFileTool
+use App\Agent\Tool\Tool;
+
+class ReadFileTool extends Tool
 {
     protected string $name = 'read_file';
 

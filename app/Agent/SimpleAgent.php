@@ -63,11 +63,9 @@ class SimpleAgent
 
     protected function executeTool($action, $input): ?string
     {
-        $toolName = $action['action'];
-        $input = $action['action_input'];
 
         /** @var Tool $tool */
-        $tool = collect($this->tools)->first(fn (Tool $tool) => $tool->name() === $toolName);
+        $tool = collect($this->tools)->first(fn (Tool $tool) => $tool->name() === $action);
 
         return $tool->execute($input);
     }

@@ -85,11 +85,13 @@ abstract class Tool
         $arguments = [];
 
         foreach ($reflector->getMethod('run')->getParameters() as $param) {
+            $attribute = $param->getAttributes()[0] ?? null;
+
             $arguments[] = new ToolArgument(
                 name: $param->getName(),
                 type: $param->getType()->getName(),
                 nullable: $param->allowsNull(),
-                description: $param->getAttributes()[0]?->newInstance()->description
+                description: $attribute?->newInstance()->description ?? null
             );
         }
 
@@ -109,10 +111,12 @@ abstract class Tool
     /**
      * @throws Exception
      */
-    public function __invoke(...$arguments)
+    public function execute($arguments)
     {
+
+        dump("executing tool {$this->name()} with arguments: ", $arguments);
         $this->validate();
 
-        return $this->run(...$arguments);
+        return call_user_func_array([$this, 'run'], $arguments);
     }
 }

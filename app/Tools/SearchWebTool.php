@@ -2,9 +2,10 @@
 
 namespace App\Tools;
 
+use App\Agent\Tool\Tool;
 use Illuminate\Support\Facades\Http;
 
-class SearchWebTool
+class SearchWebTool extends Tool
 {
     public function name(): string
     {
