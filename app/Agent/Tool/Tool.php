@@ -113,8 +113,6 @@ abstract class Tool
      */
     public function execute($arguments)
     {
-
-        dump("executing tool {$this->name()} with arguments: ", $arguments);
         $this->validate();
 
         return call_user_func_array([$this, 'run'], $arguments);

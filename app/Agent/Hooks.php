@@ -6,12 +6,7 @@ use Closure;
 
 class Hooks
 {
-    /**
-     * @var array <string, Closure>
-     */
-    protected array $listeners = [];
-
-    public function __construct(array $listeners = [])
+    public function __construct(protected array $listeners = [])
     {
     }
 
@@ -31,7 +26,9 @@ class Hooks
 
     public function trigger(string $event, ...$args): void
     {
-        ($this->listeners['*'])($event, ...$args);
+        if (isset($this->listeners['*'])) {
+            ($this->listeners['*'])($event, ...$args);
+        }
 
         if (isset($this->listeners[$event])) {
             ($this->listeners[$event])(...$args);

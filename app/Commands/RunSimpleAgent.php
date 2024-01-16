@@ -2,12 +2,19 @@
 
 namespace App\Commands;
 
+use App\Agent\Hooks;
 use App\Agent\SimpleAgent;
 use App\Tools\BrowseWebsiteTool;
 use App\Tools\ReadFileTool;
 use App\Tools\SearchWebTool;
 use App\Tools\WriteFileTool;
+use Illuminate\Support\Str;
 use LaravelZero\Framework\Commands\Command;
+
+use function Laravel\Prompts\alert;
+use function Laravel\Prompts\intro;
+use function Laravel\Prompts\note;
+use function Laravel\Prompts\warning;
 
 class RunSimpleAgent extends Command
 {
@@ -22,7 +29,14 @@ class RunSimpleAgent extends Command
             $task = $this->ask('What do you want to do?');
         }
 
-        $this->comment("Task: \n".wordwrap($task, 80));
+        $hooks = new Hooks([
+            'start' => fn ($task) => alert("Task: $task"),
+            'iteration' => fn ($iteration) => intro("Step: {$iteration}"),
+            'tool_execution' => fn ($tool, $args) => $this->table(['Tool', ...array_keys($args)], [[$tool, ...array_values($args)]]),
+            'thought' => fn ($thought) => \Laravel\Prompts\info("Thought:\n".wordwrap($thought, 80)),
+            'observation' => fn ($observation) => warning('Observation: '.Str::limit(wordwrap($observation, 80), 80 * 10)),
+            'final_answer' => fn ($finalAnswer) => note(wordwrap($finalAnswer, 80)),
+        ]);
 
         $agent = new SimpleAgent(
             tools: [
@@ -32,11 +46,10 @@ class RunSimpleAgent extends Command
                 new BrowseWebsiteTool(),
             ],
             goal: 'Respond to the human as helpfully and accurately as possible. The human will ask you to do things, and you should do them.',
+            hooks: $hooks,
         );
 
         $finalResponse = $agent->run($task);
-
-        $this->warn("Final response: {$finalResponse}");
 
     }
 }

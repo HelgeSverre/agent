@@ -27,6 +27,7 @@ class SimpleAgent
 
     public function run(string $task)
     {
+        $this->hooks?->trigger('start', $task);
 
         while (! $this->isTaskCompleted) {
             $this->currentIteration++;
@@ -41,7 +42,6 @@ class SimpleAgent
 
             $nextStep = $this->decideNextStep($task);
             $this->hooks?->trigger('next_step', $nextStep);
-
 
             $this->hooks?->trigger('thought', $nextStep['thought'] ?? '');
             $this->recordStep('thought', $nextStep['thought'] ?? '');
@@ -77,7 +77,7 @@ class SimpleAgent
         $tool = collect($this->tools)->first(fn (Tool $tool) => $tool->name() === $toolName);
 
         // TODO: Handle exception
-        $this->hooks?->trigger('tool_execution', $tool, $toolInput);
+        $this->hooks?->trigger('tool_execution', $toolName, $toolInput);
 
         return $tool->execute($toolInput);
     }
