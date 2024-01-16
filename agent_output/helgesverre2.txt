@@ -1,0 +1,52 @@
+Menu
+All-stack Developer, Workaholic, Compulsive side-hustler. Experienced developer located in Bergen, Norway 
+with over 10+ years of experience. Passionate about building web apps with the TALL -stack.
+
+FilamentPHP: Grouping Table Rows by Month and Year
+October 23, 2023
+Filament's Table builder allows you to group your table rows by date out of the box, but what if you need to group by "month and year"?
+Read article
+
+How to Create Custom Image Markers from a URL in Flutter Google Maps (with Caching)
+July 30, 2023
+A guide on how to build a god damned custom map marker without going insane in Flutter using Google Maps.
+Read article
+
+Implementing Sign-in with Apple on Flutter (iOS and Android) and the Web using a Laravel backend
+July 30, 2023
+This guide provides a detailed walkthrough of implementing Sign-in with Apple on Flutter for both iOS, Android, and the web, using a Laravel backend to handle the authentication process.
+Read article
+
+Formatting Laravel Blade files and Tailwind CSS with Prettier
+June 10, 2023
+(Updated for Prettier V3) Guide on setting up "prettier-plugin-blade", Finally, a Blade formatter that works well!
+Read article
+
+Work
+Company: Crescat AS
+Role: VP of Engineering
+Date: 2023 — Present
+
+Company: Coded AS
+Role: Co-founder
+Date: 2021 — Present
+
+Company: Tjommi ApS
+Role: CTO
+Date: 2020 — 2023
+
+Company: Guilty AS
+Role: Lead Developer
+Date: 2017 — 2020
+
+Company: Experis IT
+Role: System Developer
+Date: 2016 — 2017
+
+Company: ABAX AS
+Role: System Developer
+Date: 2015 — 2016
+
+Company: Fronttek AS
+Role: Developer
+Date: 2014 — 2015

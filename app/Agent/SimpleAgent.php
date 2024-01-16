@@ -39,13 +39,16 @@ class SimpleAgent
 
             // TODO: parse into class
 
+            dump($nextStep);
+
             $this->recordStep('thought', $nextStep['thought'] ?? '');
             $this->recordStep('action', Arr::only($nextStep, ['action', 'action_input']));
 
             if ($nextStep['action'] === 'final_answer') {
                 $this->isTaskCompleted = true;
 
-                $this->checkIfDone($task);
+                // TODO: Configurable
+                // $this->checkIfDone($task);
 
                 // TODO: should return status = "completed" or "not completed"
                 // if not completed, record step and continue  should return the next step to be done

@@ -1,0 +1,3 @@
+Title: Helge Sverre - All-stack Developer, Workaholic, Compulsive ...
+URL: https://helgesver.re
+Description: I'm Helge Sverre, a developer in Bergen, Norway, Currently CTO at Tjommi, where I tirelessly try to make computers understand what a receipt looks like, and how to extract prices from websites.
