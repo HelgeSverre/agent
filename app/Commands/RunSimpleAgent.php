@@ -3,8 +3,8 @@
 namespace App\Commands;
 
 use App\Agent\SimpleAgent;
+use App\Tools\BrowseWebsiteTool;
 use App\Tools\ReadFileTool;
-use App\Tools\RunCommandTool;
 use App\Tools\SearchWebTool;
 use App\Tools\WriteFileTool;
 use LaravelZero\Framework\Commands\Command;
@@ -15,6 +15,7 @@ class RunSimpleAgent extends Command
 
     public function handle(): void
     {
+
         $task = $this->argument('task');
 
         if (! $task) {
@@ -26,9 +27,9 @@ class RunSimpleAgent extends Command
         $agent = new SimpleAgent(
             tools: [
                 new ReadFileTool(),
-                new WriteFileTool(),
+                new WriteFileTool(base_path('agent_output')),
                 new SearchWebTool(),
-                new RunCommandTool(),
+                new BrowseWebsiteTool(),
             ],
             goal: 'Respond to the human as helpfully and accurately as possible. The human will ask you to do things, and you should do them.',
         );

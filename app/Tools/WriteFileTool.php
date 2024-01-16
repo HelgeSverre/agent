@@ -31,7 +31,7 @@ class WriteFileTool extends Tool
 
         // TODO: Protect against ../../ attacks from the LLM
 
-        $path = realpath($this->baseDir.'/'.$filename);
+        $path = $this->baseDir.'/'.$filename;
 
         file_put_contents($path, $content);
 
