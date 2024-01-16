@@ -24,27 +24,25 @@ class CallbackHandler
         }
     }
 
-    public function triggerThought(Thought $thought): void
+    public function triggerThought(string $thought): void
     {
         if ($this->onThought) {
             ($this->onThought)($thought);
         }
     }
 
-    public function triggerObservation(mixed $observation): void
+    public function triggerToolObservation(mixed $observation): void
     {
         if ($this->onObservation) {
             ($this->onObservation)($observation);
         }
     }
 
-    public function triggerAction(string $action, mixed $actionInput)
+    public function triggerToolExecution(string $action, mixed $actionInput): void
     {
         if ($this->onAction) {
-            return ($this->onAction)($action, $actionInput);
+            ($this->onAction)($action, $actionInput);
         }
-
-        return "No tool found for action: {$action}";
     }
 
     public function triggerFinalAnswer(mixed $finalAnswer): void

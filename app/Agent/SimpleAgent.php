@@ -14,8 +14,6 @@ class SimpleAgent
 
     protected int $currentIteration = 0;
 
-    protected CallbackHandler $callbacks;
-
     /**
      * @param  array|Tool[]  $tools
      */
@@ -23,25 +21,32 @@ class SimpleAgent
         protected array $tools = [],
         protected ?string $goal = null,
         protected int $maxIterations = 10,
+        protected ?Hooks $hooks = null,
     ) {
     }
 
     public function run(string $task)
     {
+
         while (! $this->isTaskCompleted) {
             $this->currentIteration++;
 
+            $this->hooks?->trigger('iteration', $this->currentIteration);
+
             if ($this->currentIteration > $this->maxIterations) {
+                $this->hooks?->trigger('max_iteration', $this->currentIteration, $this->maxIterations);
+
                 return "Max iterations reached: {$this->maxIterations}";
             }
 
             $nextStep = $this->decideNextStep($task);
+            $this->hooks?->trigger('next_step', $nextStep);
 
-            // TODO: parse into class
 
-            dump($nextStep);
-
+            $this->hooks?->trigger('thought', $nextStep['thought'] ?? '');
             $this->recordStep('thought', $nextStep['thought'] ?? '');
+
+            $this->hooks?->trigger('action', Arr::only($nextStep ?? [], ['action', 'action_input']));
             $this->recordStep('action', Arr::only($nextStep ?? [], ['action', 'action_input']));
 
             if ($nextStep['action'] === 'final_answer') {
@@ -53,10 +58,13 @@ class SimpleAgent
                 // TODO: should return status = "completed" or "not completed"
                 // if not completed, record step and continue  should return the next step to be done
 
+                $this->hooks?->trigger('final_answer', $nextStep['action_input']);
+
                 return $nextStep['action_input'];
             }
 
             $observation = $this->executeTool($nextStep['action'], $nextStep['action_input']);
+            $this->hooks?->trigger('observation', $observation);
 
             $this->recordStep('observation', $observation);
         }
@@ -69,6 +77,7 @@ class SimpleAgent
         $tool = collect($this->tools)->first(fn (Tool $tool) => $tool->name() === $toolName);
 
         // TODO: Handle exception
+        $this->hooks?->trigger('tool_execution', $tool, $toolInput);
 
         return $tool->execute($toolInput);
     }
@@ -100,6 +109,8 @@ class SimpleAgent
             tools: $this->tools,
             intermediateSteps: $this->intermediateSteps,
         )->decideNextStep();
+
+        $this->hooks?->trigger('prompt', $prompt);
 
         // TODO: Parse, if parse failure, recover with LLM call, if total failure, throw exception
 
