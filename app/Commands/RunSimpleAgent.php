@@ -22,7 +22,6 @@ class RunSimpleAgent extends Command
 
     public function handle(): void
     {
-
         $task = $this->argument('task');
 
         if (! $task) {
