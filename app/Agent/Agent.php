@@ -2,6 +2,7 @@
 
 namespace App\Agent;
 
+use App\Agent\Tool\Tool;
 use HelgeSverre\Brain\Facades\Brain;
 use Illuminate\Support\Arr;
 
@@ -13,166 +14,118 @@ class Agent
 
     protected int $currentIteration = 0;
 
-    protected CallbackHandler $callbacks;
-
+    /**
+     * @param  array|Tool[]  $tools
+     */
     public function __construct(
         protected array $tools = [],
         protected ?string $goal = null,
         protected int $maxIterations = 10,
-        ?CallbackHandler $callbacks = null,
+        protected ?Hooks $hooks = null,
     ) {
-        $this->callbacks = $callbacks ?? new CallbackHandler();
     }
 
     public function run(string $task)
     {
+        $this->hooks?->trigger('start', $task);
+
         while (! $this->isTaskCompleted) {
             $this->currentIteration++;
 
+            $this->hooks?->trigger('iteration', $this->currentIteration);
+
             if ($this->currentIteration > $this->maxIterations) {
-                $this->callbacks->triggerMaxIterationsReached($this->currentIteration, $this->maxIterations);
+                $this->hooks?->trigger('max_iteration', $this->currentIteration, $this->maxIterations);
 
                 return "Max iterations reached: {$this->maxIterations}";
             }
 
-            $this->callbacks->triggerIteration($this->currentIteration, $this->maxIterations);
+            $nextStep = $this->decideNextStep($task);
+            $this->hooks?->trigger('next_step', $nextStep);
 
-            $result = $this->think($task);
-
-            $this->updateHistory('thought', $result['thought'] ?? '');
-
-            $this->callbacks->triggerThought($result['thought'] ?? '');
-
-            $this->updateHistory('action', Arr::only($result, ['action', 'action_input']));
-            if ($result['action'] === 'final_answer') {
-                $this->isTaskCompleted = true;
-
-                $this->checkIfDone($task);
-
-                $this->callbacks->triggerFinalAnswer($result['action_input']);
-
-                return $result['action_input'];
+            if ($nextStep['thought'] ?? false) {
+                $this->hooks?->trigger('thought', $nextStep['thought'] ?? '');
+                $this->recordStep('thought', $nextStep['thought'] ?? '');
             }
 
-            $observation = $this->callbacks->triggerAction($result['action'], $result['action_input']);
-            $this->updateHistory('observation', $observation);
+            $this->hooks?->trigger('action', Arr::only($nextStep ?? [], ['action', 'action_input']));
+            $this->recordStep('action', Arr::only($nextStep ?? [], ['action', 'action_input']));
 
-            $this->callbacks->triggerObservation($observation);
+            if ($nextStep['action'] === 'final_answer') {
+                $this->isTaskCompleted = true;
+
+                // TODO: Configurable
+                $evaluation = $this->evaluateTaskCompletion($task);
+
+                if ($evaluation['status'] === 'completed') {
+                    $this->hooks?->trigger('final_answer', $nextStep['action_input']);
+
+                    return $nextStep['action_input'];
+                } else {
+                    $this->recordStep('observation', $evaluation['feedback']);
+
+                    continue;
+                }
+            }
+
+            $observation = $this->executeTool($nextStep['action'], $nextStep['action_input']);
+            $this->hooks?->trigger('observation', $observation);
+
+            $this->recordStep('observation', $observation);
         }
-
     }
 
-    protected function checkIfDone(string $task)
+    protected function executeTool($toolName, $toolInput): ?string
     {
-        $prompt = 'Consider the task and the following chat history, can the task be considered complete based on the information provided, or are there still unsolved or unfulfilled tasks? think through it step by step, make sure that ALL the requirements are met in the response, event the small details.';
-        $prompt .= "\n\n Chat History: ".$this->prepareContext();
-        $prompt .= "\n\n".$this->prepareResponseFormatInstructions();
-        $prompt .= "\n\n"."Task: {$task}";
+
+        /** @var Tool $tool */
+        $tool = collect($this->tools)->first(fn (Tool $tool) => $tool->name() === $toolName);
+
+        // TODO: Handle exception
+        $this->hooks?->trigger('tool_execution', $toolName, $toolInput);
+
+        return $tool->execute($toolInput);
+    }
+
+    protected function evaluateTaskCompletion(string $task)
+    {
+        $prompt = Prompt::make(
+            task: $task,
+            goal: $this->goal,
+            tools: $this->tools,
+            intermediateSteps: $this->intermediateSteps,
+        )->evaluateTaskCompletion();
 
         $response = Brain::json($prompt);
+
+        $this->hooks?->trigger('evaluation', $response);
+
+        // TODO: maybe it makes sense to return this data:
+        //   {"status": "completed", "feedback": "The task is completed !", "tasks": []}
+        //   or
+        //   {"status": "not completed", "feedback": "not all tasks have been completed", "tasks": ["task 1","task 2"]}
 
         return $response;
     }
 
-    protected function think(string $task)
+    protected function decideNextStep(string $task)
     {
-        $prompt = implode("\n\n", array_filter([
-            $this->goal ? "GOAL: \n{$this->goal}" : '',
-            "YOUR TASK: {$task}",
-            $this->prepareTools(),
-            $this->prepareResponseFormatInstructions(),
-            $this->prepareContext(),
-        ]));
+        $prompt = Prompt::make(
+            task: $task,
+            goal: $this->goal,
+            tools: $this->tools,
+            intermediateSteps: $this->intermediateSteps,
+        )->decideNextStep();
 
-        $this->callbacks->triggerPrompt($prompt);
+        $this->hooks?->trigger('prompt', $prompt);
+
+        // TODO: Parse, if parse failure, recover with LLM call, if total failure, throw exception
 
         return Brain::temperature(0.5)->slow()->json($prompt);
     }
 
-    protected function updateHistory(string $type, mixed $content)
+    protected function recordStep(string $type, mixed $content)
     {
         $this->intermediateSteps[] = ['type' => $type, 'content' => $content];
-    }
-
-    protected function prepareContext(): ?string
-    {
-        $context = [];
-
-        if (empty($this->intermediateSteps)) {
-            return null;
-        }
-
-        $context[] = "STEPS PERFORMED SO FAR: \n";
-
-        foreach ($this->intermediateSteps as $item) {
-
-            if ($item['type'] === 'thought') {
-                $context[] = "Thought: {$item['content']}";
-
-                continue;
-            }
-
-            if ($item['type'] === 'action') {
-                $context[] = "Action: {$item['content']['action']}";
-                $context[] = 'Action Input: '.(is_array($item['content']['action_input'])
-                        ? json_encode($item['content']['action_input'], JSON_PRETTY_PRINT)
-                        : $item['content']['action_input']);
-
-                continue;
-            }
-
-            $line = 'Observation: ';
-
-            if (is_array($item['content'])) {
-                $line .= json_encode($item['content'], JSON_PRETTY_PRINT);
-            } else {
-                $line .= $item['content'];
-            }
-
-            $context[] = trim($line);
-
-        }
-
-        return implode("\n", $context);
-    }
-
-    protected function defaultTools(): array
-    {
-        return [];
-    }
-
-    protected function prepareTools(): ?string
-    {
-        if (count($this->tools) === 0) {
-            return null;
-        }
-
-        $toolInstructions = '';
-
-        foreach ($this->tools as $toolName => $tool) {
-
-            $toolInstructions .= "\n{$toolName}: {$tool['description']}\n";
-
-            if (isset($tool['arguments']) && is_array($tool['arguments'])) {
-                foreach ($tool['arguments'] as $name => $arg) {
-                    $toolInstructions .= sprintf('- %s (%s): %s', $name, $arg['type'], $arg['description'])."\n";
-                }
-            }
-
-        }
-
-        $prefix = "AVAILABLE TOOLS (the action_input arguments are provided underneath the tool names, all of the arguments must be provided ): \n";
-
-        return $prefix.trim($toolInstructions);
-    }
-
-    protected function prepareResponseFormatInstructions(): string
-    {
-        return implode("\n", [
-            "Remember: Respond with a JSON object containing the keys: 'thought', 'action' and 'action_input'.",
-            "NOTE: If you are unable to provide an answer or use a tool, return a 'final_answer' action with the action_input 'I don't know'.",
-            "When you are done, respond with the output {'action': 'final_answer', 'action_input': 'final thoughts, instruction or answer'}",
-            'Your response MUST BE IN JSON and ADHERE TO THE REQUIRED FORMAT:',
-        ]);
     }
 }

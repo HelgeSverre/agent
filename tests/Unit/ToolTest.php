@@ -77,7 +77,7 @@ it('returns an array of ToolArgument objects from arguments method', function ()
 it('invokes the run method when called', function () {
     $testTool = new TestTool();
 
-    $result = $testTool('arg1', 123);
+    $result = $testTool->run('arg1', 123);
 
     expect($result)->toEqual('Running with arg1 and 123');
 });
@@ -103,5 +103,5 @@ it('throws an exception if run method is not implemented', function () {
         }
     };
 
-    $tool();
+    $tool->execute('some arg');
 })->throws(Exception::class, 'Tool must implement a run method');
