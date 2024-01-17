@@ -57,16 +57,11 @@ class SimpleAgent
                 // TODO: Configurable
                 $evaluation = $this->evaluateTaskCompletion($task);
 
-                dump($evaluation);
-                $this->hooks?->trigger('observation', $nextStep['feedback'] ?? 'invalid feedback');
-
                 if ($evaluation['status'] === 'completed') {
-                    // $this->hooks?->trigger('task_completed', $evaluation);
                     $this->hooks?->trigger('final_answer', $nextStep['action_input']);
 
                     return $nextStep['action_input'];
                 } else {
-                    $this->hooks?->trigger('task_not_completed', $evaluation);
                     $this->recordStep('observation', $evaluation['feedback']);
 
                     continue;
@@ -103,9 +98,7 @@ class SimpleAgent
 
         $response = Brain::json($prompt);
 
-        $this->hooks?->trigger('evaluate', $response);
-
-        dump($response);
+        $this->hooks?->trigger('evaluation', $response);
 
         // TODO: maybe it makes sense to return this data:
         //   {"status": "completed", "feedback": "The task is completed !", "tasks": []}

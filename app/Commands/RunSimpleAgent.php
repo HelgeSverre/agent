@@ -45,7 +45,7 @@ class RunSimpleAgent extends Command
             'thought' => function ($thought) {
                 $this->newLine();
                 $this->line(str_pad(' THOUGHT', 120), 'fg=black;bg=bright-blue');
-                $this->line("<fg=blue>{$thought}</>");
+                $this->line('<fg=blue>'.wordwrap($thought, 80).'</>');
             },
             'observation' => function ($observation) use ($wrap) {
                 $this->newLine();
@@ -56,6 +56,10 @@ class RunSimpleAgent extends Command
                 $this->newLine();
                 $this->line(str_pad(' EVALUATION', 120), 'fg=green;bg=black');
                 $this->line('<fg=magenta>'.Str::limit(wordwrap($eval['feedback'], 80), $wrap * 10).'</>');
+
+                foreach ($eval['tasks'] as $task) {
+                    $this->line('<fg=magenta>    - '.Str::limit(wordwrap($task, 80), $wrap * 10).'</>');
+                }
             },
             'final_answer' => function ($finalAnswer) use ($wrap) {
                 $this->newLine();
