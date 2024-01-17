@@ -30,7 +30,7 @@ class RunSimpleAgent extends Command
         }
 
         $hooks = new Hooks([
-            'start' => fn ($task) => $this->renderTextboxWithHeader('Task', $task),
+            'start' => fn ($task) => note('Task: '.$task),
             'iteration' => fn ($iteration) => intro("Step: {$iteration}"),
             'tool_execution' => fn ($tool, $args) => $this->table(['Tool', ...array_keys($args)], [[$tool, ...array_values($args)]]),
             'thought' => fn ($thought) => \Laravel\Prompts\info("Thought:\n".wordwrap($thought, 80)),
