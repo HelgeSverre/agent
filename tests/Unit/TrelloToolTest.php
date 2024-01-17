@@ -2,29 +2,25 @@
 
 namespace Tests\Unit;
 
-use PHPUnit\Framework\TestCase;
 use App\Tools\TrelloTool;
 use Illuminate\Support\Facades\Http;
+use function Pest\Laravel\assertStringContainsString;
 
-class TrelloToolTest extends TestCase
-{
-    public function testListTrelloBoards()
-    {
-        $apiKey = 'test_api_key';
-        $token = 'test_token';
-        $fakeResponse = [
-            ['name' => 'Board 1', 'url' => 'http://trello.com/board1'],
-            ['name' => 'Board 2', 'url' => 'http://trello.com/board2'],
-        ];
+it('lists Trello boards', function () {
+    $apiKey = 'test_api_key';
+    $token = 'test_token';
+    $fakeResponse = [
+        ['name' => 'Board 1', 'url' => 'http://trello.com/board1'],
+        ['name' => 'Board 2', 'url' => 'http://trello.com/board2'],
+    ];
 
-        Http::fake([
-            'api.trello.com/1/members/me/boards*' => Http::response($fakeResponse, 200),
-        ]);
+    Http::fake([
+        'api.trello.com/1/members/me/boards*' => Http::response($fakeResponse, 200),
+    ]);
 
-        $trelloTool = new TrelloTool($apiKey, $token);
-        $result = $trelloTool->run();
+    $trelloTool = new TrelloTool($apiKey, $token);
+    $result = $trelloTool->run();
 
-        $expectedMarkdown = "- [Board 1](http://trello.com/board1)\n- [Board 2](http://trello.com/board2)";
-        $this->assertStringContainsString($expectedMarkdown, $result);
-    }
-}
+    $expectedMarkdown = "- [Board 1](http://trello.com/board1)\n- [Board 2](http://trello.com/board2)";
+    assertStringContainsString($expectedMarkdown, $result);
+});
