@@ -10,10 +10,18 @@ class TrelloTool extends Tool
     protected string $name = 'list_trello_boards';
 
     protected string $description = 'List all Trello boards visible to the user';
+    private string $apiKey;
+    private string $token;
 
-    public function run(string $apiKey, string $token): string
+    public function __construct(string $apiKey, string $token)
     {
-        $url = "https://api.trello.com/1/members/me/boards?fields=name,url&key={$apiKey}&token={$token}";
+        $this->apiKey = $apiKey;
+        $this->token = $token;
+    }
+
+    public function run(): string
+    {
+        $url = "https://api.trello.com/1/members/me/boards?fields=name,url&key={$this->apiKey}&token={$this->token}";
         $response = Http::get($url);
 
         if ($response->failed()) {
@@ -26,5 +34,6 @@ class TrelloTool extends Tool
         })->implode("\n");
 
         return "Trello Boards:\n\n{$markdownList}";
+        ...
     }
 }
