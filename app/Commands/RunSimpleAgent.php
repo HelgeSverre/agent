@@ -12,10 +12,6 @@ use App\Tools\WriteFileTool;
 use Illuminate\Support\Str;
 use LaravelZero\Framework\Commands\Command;
 
-use function Laravel\Prompts\intro;
-use function Laravel\Prompts\note;
-use function Laravel\Prompts\warning;
-
 class RunSimpleAgent extends Command
 {
     protected $signature = 'simple {task?}';
@@ -28,14 +24,44 @@ class RunSimpleAgent extends Command
             $task = $this->ask('What do you want to do?');
         }
 
+        $wrap = 120;
+
         $hooks = new Hooks([
-            'start' => fn ($task) => note('Task: '.$task),
-            'iteration' => fn ($iteration) => intro("Step: {$iteration}"),
-            'tool_execution' => fn ($tool, $args) => $this->table(['Tool', ...array_keys($args)], [[$tool, ...array_values($args)]]),
-            'thought' => fn ($thought) => \Laravel\Prompts\info("Thought:\n".wordwrap($thought, 80)),
-            'observation' => fn ($observation) => warning('Observation: '.Str::limit(wordwrap($observation, 80), 80 * 10)),
-            'final_answer' => fn ($finalAnswer) => note(wordwrap($finalAnswer, 80)),
-            'next_step' => fn ($step) => dump($step),
+            'start' => function ($task) {
+                $this->newLine();
+                $this->line(str_pad(' TASK', 120), 'fg=black;bg=bright-cyan');
+                $this->line("<fg=cyan>{$task}</>");
+            },
+            'iteration' => function ($iteration) {
+                $this->newLine();
+                $this->line(str_pad(' ITERATION', 120), 'fg=black;bg=bright-white');
+                $this->line("Step: {$iteration}");
+            },
+            'tool_execution' => function ($tool, $args) {
+                $this->newLine();
+                $this->line(str_pad(' TOOL EXECUTION', 120), 'fg=black;bg=bright-yellow');
+                $this->table(['Tool', ...array_keys($args)], [[$tool, ...array_values($args)]]);
+            },
+            'thought' => function ($thought) {
+                $this->newLine();
+                $this->line(str_pad(' THOUGHT', 120), 'fg=black;bg=bright-blue');
+                $this->line("<fg=blue>{$thought}</>");
+            },
+            'observation' => function ($observation) use ($wrap) {
+                $this->newLine();
+                $this->line(str_pad(' OBSERVATION', 120), 'fg=black;bg=bright-red');
+                $this->line('<fg=magenta>'.Str::limit(wordwrap($observation, 80), $wrap * 10).'</>');
+            },
+            'evaluation' => function ($eval) use ($wrap) {
+                $this->newLine();
+                $this->line(str_pad(' EVALUATION', 120), 'fg=green;bg=black');
+                $this->line('<fg=magenta>'.Str::limit(wordwrap($eval['feedback'], 80), $wrap * 10).'</>');
+            },
+            'final_answer' => function ($finalAnswer) use ($wrap) {
+                $this->newLine();
+                $this->line(str_pad(' FINAL ANSWER', 120), 'fg=blue;bg=black');
+                $this->line(wordwrap($finalAnswer, $wrap));
+            },
         ]);
 
         $agent = new SimpleAgent(

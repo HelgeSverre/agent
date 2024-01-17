@@ -43,8 +43,10 @@ class SimpleAgent
             $nextStep = $this->decideNextStep($task);
             $this->hooks?->trigger('next_step', $nextStep);
 
-            $this->hooks?->trigger('thought', $nextStep['thought'] ?? '');
-            $this->recordStep('thought', $nextStep['thought'] ?? '');
+            if ($nextStep['thought'] ?? false) {
+                $this->hooks?->trigger('thought', $nextStep['thought'] ?? '');
+                $this->recordStep('thought', $nextStep['thought'] ?? '');
+            }
 
             $this->hooks?->trigger('action', Arr::only($nextStep ?? [], ['action', 'action_input']));
             $this->recordStep('action', Arr::only($nextStep ?? [], ['action', 'action_input']));
@@ -53,14 +55,22 @@ class SimpleAgent
                 $this->isTaskCompleted = true;
 
                 // TODO: Configurable
-                // $this->checkIfDone($task);
+                $evaluation = $this->evaluateTaskCompletion($task);
 
-                // TODO: should return status = "completed" or "not completed"
-                // if not completed, record step and continue  should return the next step to be done
+                dump($evaluation);
+                $this->hooks?->trigger('observation', $nextStep['feedback'] ?? 'invalid feedback');
 
-                $this->hooks?->trigger('final_answer', $nextStep['action_input']);
+                if ($evaluation['status'] === 'completed') {
+                    // $this->hooks?->trigger('task_completed', $evaluation);
+                    $this->hooks?->trigger('final_answer', $nextStep['action_input']);
 
-                return $nextStep['action_input'];
+                    return $nextStep['action_input'];
+                } else {
+                    $this->hooks?->trigger('task_not_completed', $evaluation);
+                    $this->recordStep('observation', $evaluation['feedback']);
+
+                    continue;
+                }
             }
 
             $observation = $this->executeTool($nextStep['action'], $nextStep['action_input']);
@@ -82,7 +92,7 @@ class SimpleAgent
         return $tool->execute($toolInput);
     }
 
-    protected function checkIfDone(string $task)
+    protected function evaluateTaskCompletion(string $task)
     {
         $prompt = Prompt::make(
             task: $task,
@@ -92,6 +102,10 @@ class SimpleAgent
         )->evaluateTaskCompletion();
 
         $response = Brain::json($prompt);
+
+        $this->hooks?->trigger('evaluate', $response);
+
+        dump($response);
 
         // TODO: maybe it makes sense to return this data:
         //   {"status": "completed", "feedback": "The task is completed !", "tasks": []}

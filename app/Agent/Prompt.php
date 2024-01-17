@@ -51,7 +51,13 @@ class Prompt
             .'or are there still unsolved or unfulfilled tasks? think through it step by step, '
             .'make sure that ALL the requirements are met in the response, event the small details.',
             $this->prepareContext(),
-            $this->prepareResponseFormatInstructions(),
+
+            "Remember: Respond with a JSON object containing the keys: 'status', 'feedback' and tasks.",
+            "The status can be 'completed' or 'not completed'.",
+            'The feedback should be a string explaining why the task is completed or not completed, the feedback should be instructive and helpful.',
+            'The tasks should be an array of strings, each string should be a subtask that is not completed yet, or an empty list if all tasks are completed.',
+            'Your response MUST BE IN JSON and ADHERE TO THE REQUIRED FORMAT:',
+
             "Task: {$this->task}",
         ]);
     }
