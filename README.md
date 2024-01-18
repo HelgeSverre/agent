@@ -7,11 +7,19 @@
 
 Proof of concept AI Agent using the [Brain](https://github.com/helgesverre/brain) package.
 
+## See it in action.
 
+<a href="https://share.cleanshot.com/kTZXyFnY"><img src="./art/thumb.png"></a>
 
-![Demo](./art/video.mp4)
+Video Link: https://share.cleanshot.com/kTZXyFnY
 
-Demo Video: https://share.cleanshot.com/kTZXyFnY
+## Installation
+
+Install it via composer:
+
+```bash
+composer require helgesverre/agent
+```
 
 ## TODO:
 
