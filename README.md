@@ -8,9 +8,8 @@
 Proof of concept AI Agent using the [Brain](https://github.com/helgesverre/brain) package.
 
 
-<video width="100%" controls>
-  <source src="./art/video.mp4" type="video/mp4">
-</video>
+
+![Demo](./art/video.mp4)
 
 Demo Video: https://share.cleanshot.com/kTZXyFnY
 
