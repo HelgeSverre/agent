@@ -26,5 +26,12 @@ class TestCase extends Orchestra
 
         $app->useEnvironmentPath(__DIR__.'/..');
 
+        config()->set('imap.accounts.default.host', env('IMAP_HOST'));
+        config()->set('imap.accounts.default.port', env('IMAP_PORT'));
+        config()->set('imap.accounts.default.encryption', env('IMAP_ENCRYPTION'));
+        config()->set('imap.accounts.default.validate_cert', env('IMAP_VALIDATE_CERT'));
+        config()->set('imap.accounts.default.username', env('IMAP_USERNAME'));
+        config()->set('imap.accounts.default.password', env('IMAP_PASSWORD'));
+        config()->set('imap.accounts.default.protocol', env('IMAP_PROTOCOL'));
     }
 }

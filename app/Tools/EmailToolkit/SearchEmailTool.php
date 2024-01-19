@@ -4,9 +4,9 @@ namespace App\Tools\EmailToolkit;
 
 use App\Agent\Tool\Description;
 use App\Agent\Tool\Tool;
+use App\TextUtils;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
-use Stevebauman\Hypertext\Transformer;
 use Webklex\PHPIMAP\Client;
 use Webklex\PHPIMAP\Message;
 
@@ -29,17 +29,22 @@ class SearchEmailTool extends Tool
         #[Description('Only search for emails after this date')]
         ?Carbon $afterDate = null,
         #[Description('Only search for emails before this date')]
-        ?Carbon $fromDate = null
+        ?Carbon $fromDate = null,
+        #[Description('Which page to return')]
+        int $page = 1,
+        #[Description('How many results to return per page (try to keep this number lower than 20)')]
+        int $limit = 10,
     ) {
         $this->client->connect();
 
         $messages = $this->client->getFolder('INBOX')->query()
             ->where(array_filter([
-                'TEXT' => $searchQuery, // TODO: Breaks on øæå etc, prob imap config issue.
+                'TEXT' => $searchQuery,
                 'SINCE' => $afterDate,
                 'BEFORE' => $fromDate,
             ]))
-            ->limit(100)
+            ->setPage($page)
+            ->limit($limit)
             ->get();
 
         $results = [];
@@ -48,26 +53,24 @@ class SearchEmailTool extends Tool
             $results[] = $this->transformToText($message);
         }
 
-        return "The email search returned the following emails: \n".implode('\n\n', $results);
+        return "The email search returned the following emails: \n".implode("\n\n", $results);
     }
 
     protected function transformToText(Message $message): string
     {
+        $body = $message->getHTMLBody() ?: $message->getTextBody();
 
-        $body = $message->getTextBody();
-
-        if (! $body) {
-            $body = (new Transformer)
-                ->keepLinks()
-                ->keepNewLines()
-                ->toText($message->getHTMLBody());
-        }
+        $body = Str::of(TextUtils::cleanHtml($body))
+            ->stripTags()
+            ->replaceMatches('/(\W)\1+/', '$1')
+            ->squish()
+            ->trim();
 
         return implode("\n", [
             'Subject: '.$message->getSubject(),
             'From: '.$message->getFrom(),
             'Date: '.$message->getDate(),
-            'Text: '.Str::of($body)->squish()->trim()->toString(),
+            'Text: '.TextUtils::cleanHtml($body),
         ]);
 
     }

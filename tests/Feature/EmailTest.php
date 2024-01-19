@@ -44,6 +44,16 @@ it('returns a list of matching emails', function () {
 
 });
 
+it('can search for a word containing "ø"', function () {
+
+    $testTool = new SearchEmailTool();
+
+    $result = $testTool->run('Desember 2023', afterDate: Carbon::now()->subMonths(6), fromDate: Carbon::now());
+
+    dd($result);
+
+});
+
 it('creates draft messages in draft folder', function () {
 
     $testTool = new CreateDraftEmailTool();
