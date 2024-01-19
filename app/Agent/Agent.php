@@ -69,7 +69,7 @@ class Agent
             }
 
             $observation = $this->executeTool($nextStep['action'], $nextStep['action_input']);
-            $this->hooks?->trigger('observation', $observation);
+            $this->hooks?->trigger('observation', $obsezrvation);
 
             $this->recordStep('observation', $observation);
         }
@@ -80,6 +80,10 @@ class Agent
 
         /** @var Tool $tool */
         $tool = collect($this->tools)->first(fn (Tool $tool) => $tool->name() === $toolName);
+
+        if ($tool === null) {
+            return "Tool not found: {$toolName}";
+        }
 
         // TODO: Handle exception
         $this->hooks?->trigger('tool_execution', $toolName, $toolInput);

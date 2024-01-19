@@ -30,35 +30,41 @@ class RunAgent extends Command
 
         $hooks = new Hooks([
             'start' => function ($task) {
-                $this->newLine();
+                $this->newLine(2);
                 $this->line(str_pad(' TASK', 120), 'fg=black;bg=bright-cyan');
-                $this->line("<fg=cyan>{$task}</>");
+                $this->newLine();
+                $this->line('<fg=cyan>'.wordwrap($task, 80).'</>');
             },
             'iteration' => function ($iteration) {
-                $this->newLine();
+                $this->newLine(2);
                 $this->line(str_pad(' ITERATION', 120), 'fg=black;bg=bright-white');
+                $this->newLine();
                 $this->line("Step: {$iteration}");
             },
             'tool_execution' => function ($tool, $args) {
-                $this->newLine();
+                $this->newLine(2);
                 $this->line(str_pad(' TOOL EXECUTION', 120), 'fg=black;bg=bright-yellow');
+                $this->newLine();
                 $this->line("Tool name: {$tool}");
                 $this->line('Tool Arguments:');
                 $this->line(json_encode($args, JSON_PRETTY_PRINT));
             },
             'thought' => function ($thought) {
-                $this->newLine();
+                $this->newLine(2);
                 $this->line(str_pad(' THOUGHT', 120), 'fg=black;bg=bright-blue');
+                $this->newLine();
                 $this->line('<fg=blue>'.wordwrap($thought, 80).'</>');
             },
             'observation' => function ($observation) use ($wrap) {
-                $this->newLine();
+                $this->newLine(2);
                 $this->line(str_pad(' OBSERVATION', 120), 'fg=black;bg=bright-red');
+                $this->newLine();
                 $this->line('<fg=magenta>'.Str::limit(wordwrap($observation, 80), $wrap * 10).'</>');
             },
             'evaluation' => function ($eval) use ($wrap) {
-                $this->newLine();
+                $this->newLine(2);
                 $this->line(str_pad(' EVALUATION', 120), 'fg=green;bg=black');
+                $this->newLine();
                 $this->line('<fg=magenta>'.Str::limit(wordwrap($eval['feedback'], 80), $wrap * 10).'</>');
 
                 foreach ($eval['tasks'] as $task) {
@@ -66,8 +72,9 @@ class RunAgent extends Command
                 }
             },
             'final_answer' => function ($finalAnswer) use ($wrap) {
-                $this->newLine();
+                $this->newLine(2);
                 $this->line(str_pad(' FINAL ANSWER', 120), 'fg=blue;bg=black');
+                $this->newLine();
                 $this->line(wordwrap($finalAnswer, $wrap));
             },
         ]);

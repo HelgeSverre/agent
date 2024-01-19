@@ -35,10 +35,9 @@ class SearchEmailTool extends Tool
 
         $messages = $this->client->getFolder('INBOX')->query()
             ->where(array_filter([
-                'TEXT' => $searchQuery,
+                'TEXT' => $searchQuery, // TODO: Breaks on øæå etc, prob imap config issue.
                 'SINCE' => $afterDate,
                 'BEFORE' => $fromDate,
-
             ]))
             ->limit(100)
             ->get();
