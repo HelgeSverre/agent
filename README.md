@@ -25,7 +25,27 @@ composer require helgesverre/agent
 
 - Add more tests for the agent class
 - Add database tool (sqlite)
+- Trello tool
+- Google Keep tool
+- Google Calendar Tool
 - trim the interaction history to a max length so we dont overflow the context length.
 - Implement "crew" feature (multiple agents)
     - Delegate task to other agent
-    - Ask other agent for help 
+    - Ask other agent for help
+
+
+- Vector database integration (swappable?)
+    - https://turbopuffer.com/
+    - Qdrant
+    - Chroma
+    - Milvus
+
+## Ideas:
+
+- Investigate embedding [Smol Developer](https://github.com/smol-ai/developer) as a tool
+- Implement a "memory" feature, so the agent can remember
+  things. [AgentMemory](https://github.com/autonomousresearchgroup/agentmemory)
+- Implement an API that follows the [Agent Protocol](https://agentprotocol.ai/) (or make up something similar)
+- Separate out the "agent" library code, then build a gui on top of it. (Electron, NativePHP, Livewire with regular web
+  server?)
+- Figure out if streaming is a pain in the ass to implement using generators
