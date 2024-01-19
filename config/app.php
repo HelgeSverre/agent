@@ -1,5 +1,7 @@
 <?php
 
+use Webklex\IMAP\Providers\LaravelServiceProvider;
+
 return [
 
     /*
@@ -69,6 +71,7 @@ return [
     'providers' => [
         App\Providers\AppServiceProvider::class,
         OpenAI\Laravel\ServiceProvider::class,
+        LaravelServiceProvider::class,
     ],
 
 ];

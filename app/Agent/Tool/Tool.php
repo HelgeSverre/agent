@@ -2,7 +2,9 @@
 
 namespace App\Agent\Tool;
 
+use Carbon\Carbon;
 use Closure;
+use DateTime;
 use Exception;
 use ReflectionClass;
 use ReflectionFunction;
@@ -87,9 +89,15 @@ abstract class Tool
         foreach ($reflector->getMethod('run')->getParameters() as $param) {
             $attribute = $param->getAttributes()[0] ?? null;
 
+            $type = $param->getType()?->getName();
+
+            if ($type == DateTime::class || $type === Carbon::class || \Illuminate\Support\Carbon::class) {
+                $type = 'string';
+            }
+
             $arguments[] = new ToolArgument(
                 name: $param->getName(),
-                type: $param->getType()->getName(),
+                type: $type ?? 'string',
                 nullable: $param->allowsNull(),
                 description: $attribute?->newInstance()->description ?? null
             );

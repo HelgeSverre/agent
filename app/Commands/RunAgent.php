@@ -5,6 +5,8 @@ namespace App\Commands;
 use App\Agent\Agent;
 use App\Agent\Hooks;
 use App\Tools\BrowseWebsiteTool;
+use App\Tools\EmailToolkit\CreateDraftEmailTool;
+use App\Tools\EmailToolkit\SearchEmailTool;
 use App\Tools\ReadFileTool;
 use App\Tools\RunCommandTool;
 use App\Tools\SearchWebTool;
@@ -40,7 +42,9 @@ class RunAgent extends Command
             'tool_execution' => function ($tool, $args) {
                 $this->newLine();
                 $this->line(str_pad(' TOOL EXECUTION', 120), 'fg=black;bg=bright-yellow');
-                $this->table(['Tool', ...array_keys($args)], [[$tool, ...array_values($args)]]);
+                $this->line("Tool name: {$tool}");
+                $this->line('Tool Arguments:');
+                $this->line(json_encode($args, JSON_PRETTY_PRINT));
             },
             'thought' => function ($thought) {
                 $this->newLine();
@@ -75,6 +79,8 @@ class RunAgent extends Command
                 new SearchWebTool(),
                 new BrowseWebsiteTool(),
                 new RunCommandTool(),
+                new SearchEmailTool(),
+                new CreateDraftEmailTool(),
             ],
             goal: 'Respond to the human as helpfully and accurately as possible. The human will ask you to do things, and you should do them.',
             hooks: $hooks,
