@@ -38,7 +38,7 @@ class CreateDraftEmailTool extends Tool
         $draft = $this->client->getFolder('[Gmail]/Drafts')
             ->appendMessage(
                 "From: $from
-                To: $to
+To: $to
 Subject: $subject
 Content-Type: text/plain;
 	charset=\"us-ascii\"

@@ -10,12 +10,21 @@ class ReadFileTool extends Tool
 
     protected string $description = 'read a file from the local file system';
 
-    public function run(string $fileName): string
+    protected string $baseDir;
+
+    public function __construct($baseDir = null)
     {
-        if (file_exists('./output') === false) {
-            mkdir('./output');
+        $this->baseDir = $baseDir ?? base_path('output');
+    }
+
+    public function run(string $filename): string
+    {
+        if (file_exists($this->baseDir) === false) {
+            mkdir($this->baseDir);
         }
 
-        return 'File contents: '.file_get_contents('./output/'.$fileName);
+        $path = $this->baseDir.'/'.$filename;
+
+        return 'File contents: '.$path;
     }
 }

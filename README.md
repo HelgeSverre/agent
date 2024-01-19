@@ -25,6 +25,7 @@ composer require helgesverre/agent
 
 - Add more tests for the agent class
 - Add database tool (sqlite)
+- trim the interaction history to a max length so we dont overflow the context length.
 - Implement "crew" feature (multiple agents)
     - Delegate task to other agent
     - Ask other agent for help 

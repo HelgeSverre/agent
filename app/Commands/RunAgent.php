@@ -75,7 +75,7 @@ class RunAgent extends Command
         $agent = new Agent(
             tools: [
                 new ReadFileTool(),
-                new WriteFileTool(base_path('agent_output')),
+                new WriteFileTool(base_path('output')),
                 new SearchWebTool(),
                 new BrowseWebsiteTool(),
                 new RunCommandTool(),

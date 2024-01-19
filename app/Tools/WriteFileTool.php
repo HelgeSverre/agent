@@ -7,16 +7,16 @@ use App\Agent\Tool\Tool;
 
 class WriteFileTool extends Tool
 {
+    protected string $name = 'write_file';
+
+    protected string $description = 'write a file from the local file system';
+
     protected string $baseDir;
 
     public function __construct($baseDir = null)
     {
-        $this->baseDir = $baseDir ?? base_path('agent_output');
+        $this->baseDir = $baseDir ?? base_path('output');
     }
-
-    protected string $name = 'write_file';
-
-    protected string $description = 'write a file from the local file system';
 
     public function run(
         #[Description('The name of the file to write')]
