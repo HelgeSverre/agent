@@ -20,12 +20,11 @@ class TestCase extends Orchestra
     public function getEnvironmentSetUp($app)
     {
         // Load .env.test into the environment.
-        if (file_exists(dirname(__DIR__) . '/.env')) {
+        if (file_exists(dirname(__DIR__).'/.env')) {
             (Dotenv::createImmutable(dirname(__DIR__), '.env'))->load();
         }
 
-
-        $app->useEnvironmentPath(__DIR__ . '/..');
+        $app->useEnvironmentPath(__DIR__.'/..');
 
     }
 }
