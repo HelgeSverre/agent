@@ -66,6 +66,7 @@ class SearchEmailTool extends Tool
 
         return implode("\n", [
             'Subject: '.$message->getSubject(),
+            'From: '.$message->getFrom(),
             'Date: '.$message->getDate(),
             'Text: '.Str::of($body)->squish()->trim()->toString(),
         ]);

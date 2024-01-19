@@ -3,9 +3,12 @@
 namespace App\Agent\Tool;
 
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Closure;
 use DateTime;
+use DateTimeImmutable;
 use Exception;
+use Illuminate\Support\Arr;
 use ReflectionClass;
 use ReflectionFunction;
 
@@ -89,15 +92,9 @@ abstract class Tool
         foreach ($reflector->getMethod('run')->getParameters() as $param) {
             $attribute = $param->getAttributes()[0] ?? null;
 
-            $type = $param->getType()?->getName();
-
-            if ($type == DateTime::class || $type === Carbon::class || \Illuminate\Support\Carbon::class) {
-                $type = 'string';
-            }
-
             $arguments[] = new ToolArgument(
                 name: $param->getName(),
-                type: $type ?? 'string',
+                type: $param->getType()?->getName() ?? 'string',
                 nullable: $param->allowsNull(),
                 description: $attribute?->newInstance()->description ?? null
             );
@@ -123,6 +120,28 @@ abstract class Tool
     {
         $this->validate();
 
-        return call_user_func_array([$this, 'run'], $arguments);
+        $args = $this->arguments();
+
+        foreach ($args as $arg) {
+
+            $value = $arguments[$arg->name] ?? null;
+
+            if (! $value) {
+                continue;
+            }
+
+            $arguments[$arg->name] = match ($arg->type) {
+                Carbon::class => Carbon::parse($value),
+                CarbonImmutable::class => CarbonImmutable::parse($value),
+                DateTime::class => Carbon::parse($value)->toDateTime(),
+                DateTimeImmutable::class => CarbonImmutable::parse($value)->toDateTimeImmutable(),
+                default => $value
+            };
+        }
+
+        // TODO: remove extra arguments that are not defined in the tool
+        $validArgs = Arr::only($arguments, collect($args)->map(fn ($arg) => $arg->name)->toArray());
+
+        return call_user_func_array([$this, 'run'], $validArgs);
     }
 }
