@@ -49,3 +49,5 @@ composer require helgesverre/agent
 - Separate out the "agent" library code, then build a gui on top of it. (Electron, NativePHP, Livewire with regular web
   server?)
 - Figure out if streaming is a pain in the ass to implement using generators
+- Integrate [Aider](https://aider.chat) via Docker as a runnable
+  tool [see](https://aider.chat/docs/faq.html#can-i-script-aider)
