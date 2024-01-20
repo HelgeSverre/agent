@@ -51,3 +51,18 @@ composer require helgesverre/agent
 - Figure out if streaming is a pain in the ass to implement using generators
 - Integrate [Aider](https://aider.chat) via Docker as a runnable
   tool [see](https://aider.chat/docs/faq.html#can-i-script-aider)
+- Look into how to make a usable abstraction around https://github.com/chrome-php/chrome that the Agent can interact
+  with, so you could make it browse a website and discover links , buttons etc without passing the entire html content
+  into the prompt, then provide interaction with it via a seperate agent (hands of the subtask to the browser agent,
+  which knows the original task and some context, then is only focused on performing those browsing steps in sequence.)
+
+## Architecture Todos
+
+- Extract agent library into seperate package
+- Bundle reusable and generic tools as part of agent lib, things that are specifi to myself (trello, imap) should be
+  moved into:
+- Make standard laravel  (not laravel zero) webapp that will use the agent library, provide custom tools and a web ui.
+    - setup Laravel wave and livewire event listening stuff
+    - https://github.com/qruto/laravel-wave
+    - https://fly.io/laravel-bytes/streaming-to-the-browser-with-livewire/
+
