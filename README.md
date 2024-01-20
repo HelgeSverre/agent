@@ -66,3 +66,34 @@ composer require helgesverre/agent
     - https://github.com/qruto/laravel-wave
     - https://fly.io/laravel-bytes/streaming-to-the-browser-with-livewire/
 
+## Web UI
+
+Structure:
+
+3 column layout
+
+
+---- 
+
+- Crews
+    - Agent 1 & 2
+        - Task 1
+        - Task 2
+            - Timeline (Actions, observations, thoughts etc)
+- Agents
+    - Task 1
+    - Task 2
+        - Timeline (Actions, observations, thoughts etc)
+
+
+- Create Crew
+    - Create or select agent
+        - Name
+        - Goal
+        - Tools
+    - Create Tasks
+        - Task Description
+        - Task specific tools
+- Create Agent
+
+---- 
