@@ -9,23 +9,22 @@ class TrelloService
     public function __construct(
         protected string $apiKey,
         protected string $apiToken
-    )
-    {
+    ) {
     }
 
     protected function sendRequest($endpoint, $params = [])
     {
         return Http::get("https://api.trello.com/1/{$endpoint}", [
             ...$params,
-            "key" => $this->apiKey,
-            "token" => $this->apiToken,
+            'key' => $this->apiKey,
+            'token' => $this->apiToken,
         ])->json();
     }
 
     public function listWorkspaces()
     {
         // Assuming you want to list the teams (workspaces)
-        return $this->sendRequest('members/me/organizations',[
+        return $this->sendRequest('members/me/organizations', [
             'fields' => 'id,name,desc,displayName,url',
         ]);
     }
