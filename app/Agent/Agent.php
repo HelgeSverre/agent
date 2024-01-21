@@ -69,7 +69,7 @@ class Agent
             }
 
             $observation = $this->executeTool($nextStep['action'], $nextStep['action_input']);
-            $this->hooks?->trigger('observation', $obsezrvation);
+            $this->hooks?->trigger('observation', $observation);
 
             $this->recordStep('observation', $observation);
         }
