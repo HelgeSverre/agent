@@ -48,7 +48,7 @@ it('can search for a word containing "ø"', function () {
 
     $testTool = new SearchEmailTool();
 
-    $result = $testTool->run('Desember 2023', afterDate: Carbon::now()->subMonths(6), fromDate: Carbon::now());
+    $result = $testTool->run('finansiell helse', afterDate: Carbon::now()->subMonths(6), fromDate: Carbon::now());
 
     dd($result);
 

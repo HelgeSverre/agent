@@ -7,6 +7,7 @@ use App\Agent\Hooks;
 use App\Tools\BrowseWebsiteTool;
 use App\Tools\EmailToolkit\CreateDraftEmailTool;
 use App\Tools\EmailToolkit\SearchEmailTool;
+use App\Tools\EmailToolkit\SummarizeConversationHistoryTool;
 use App\Tools\ReadFileTool;
 use App\Tools\RunCommandTool;
 use App\Tools\SearchWebTool;
@@ -59,7 +60,7 @@ class RunAgent extends Command
                 $this->newLine(2);
                 $this->line(str_pad(' OBSERVATION', 120), 'fg=black;bg=bright-red');
                 $this->newLine();
-                $this->line('<fg=magenta>'.Str::limit(wordwrap($observation, 80), $wrap * 10).'</>');
+                $this->line('<fg=magenta>'.Str::limit(wordwrap($observation, 80), $wrap * 20).'</>');
             },
             'evaluation' => function ($eval) use ($wrap) {
                 $this->newLine(2);
@@ -87,13 +88,21 @@ class RunAgent extends Command
                 new BrowseWebsiteTool(),
                 new RunCommandTool(),
                 new SearchEmailTool(),
+                new SummarizeConversationHistoryTool(),
                 new CreateDraftEmailTool(),
             ],
-            goal: 'Respond to the human as helpfully and accurately as possible. The human will ask you to do things, and you should do them.',
+            goal: 'Current date:'.date('Y-m-d')."\n".
+            'Respond to the human as helpfully and accurately as possible.'.
+            'The human will ask you to do things, and you should do them.',
             hooks: $hooks,
         );
 
-        $finalResponse = $agent->run($task);
+        $finalResponse = $agent->run(
+            'Fetch the latest 50 emails from BOB.no,'.
+            'find all the the people contact i have had written conversations with from BOB, '.
+            'store the names and emails in contacts.txt, '.
+            'then provide a summary of each individual person from the past year'.
+            'and save them as individual summary files using the contact name as the filename');
 
     }
 }

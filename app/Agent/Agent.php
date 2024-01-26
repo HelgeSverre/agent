@@ -30,6 +30,9 @@ class Agent
         $this->hooks?->trigger('start', $task);
 
         while (! $this->isTaskCompleted) {
+
+            $this->trimIntermediateSteps();
+
             $this->currentIteration++;
 
             $this->hooks?->trigger('iteration', $this->currentIteration);
@@ -110,6 +113,13 @@ class Agent
         //   {"status": "not completed", "feedback": "not all tasks have been completed", "tasks": ["task 1","task 2"]}
 
         return $response;
+    }
+
+    protected function trimIntermediateSteps(): void
+    {
+        if (count($this->intermediateSteps) > 5) {
+            $this->intermediateSteps = array_slice($this->intermediateSteps, -5);
+        }
     }
 
     protected function decideNextStep(string $task)
