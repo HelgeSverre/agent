@@ -87,9 +87,9 @@ class RunAgent extends Command
                 new SearchWebTool(),
                 new BrowseWebsiteTool(),
                 new RunCommandTool(),
-                new SearchEmailTool(),
-                new SummarizeConversationHistoryTool(),
-                new CreateDraftEmailTool(),
+                //                new SearchEmailTool(),
+                //                new SummarizeConversationHistoryTool(),
+                //                new CreateDraftEmailTool(),
             ],
             goal: 'Current date:'.date('Y-m-d')."\n".
             'Respond to the human as helpfully and accurately as possible.'.
@@ -97,12 +97,8 @@ class RunAgent extends Command
             hooks: $hooks,
         );
 
-        $finalResponse = $agent->run(
-            'Fetch the latest 50 emails from BOB.no,'.
-            'find all the the people contact i have had written conversations with from BOB, '.
-            'store the names and emails in contacts.txt, '.
-            'then provide a summary of each individual person from the past year'.
-            'and save them as individual summary files using the contact name as the filename');
+        $finalResponse = $agent->run('summarize the first 3 articles on hackernews, and write them to a file,
+        note that you can also use the browse command to browse the website and the links therein, find the first 3 article links and visit the page it links to and write a summary for the entire content instead of the excerpt .');
 
     }
 }

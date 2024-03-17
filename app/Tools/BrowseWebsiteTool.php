@@ -4,6 +4,7 @@ namespace App\Tools;
 
 use App\Agent\Tool\Tool;
 use App\TextUtils;
+use Crwlr\Html2Text\Html2Text;
 use Illuminate\Support\Facades\Http;
 
 class BrowseWebsiteTool extends Tool
@@ -20,7 +21,10 @@ class BrowseWebsiteTool extends Tool
             return sprintf('Could not retrieve website contents for url: %s - %s - %s', $url, $response->status(), $response->body());
         }
 
-        $text = TextUtils::cleanHtml($response->body());
+        $html = $response->body();
+
+        $text = Html2Text::convert($html);
+        //        $text = TextUtils::cleanHtml($html);
 
         return "Website contents: \n\n{$text}";
     }

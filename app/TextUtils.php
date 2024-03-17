@@ -22,7 +22,7 @@ class TextUtils
             $end = min($i + $chunkSize, $length);
 
             // Ensure we don't split in the middle of a word
-            while ($end < $length && !ctype_space($text[$end]) && !ctype_punct($text[$end])) {
+            while ($end < $length && ! ctype_space($text[$end]) && ! ctype_punct($text[$end])) {
                 $end++;
             }
 
@@ -38,13 +38,11 @@ class TextUtils
         return $chunks;
     }
 
-
     public static function cleanHtml(
         string $html,
-        array  $elementsToRemove = ['script', 'style', 'link', 'head', 'noscript', 'template', 'svg', 'br', 'hr', 'footer', 'nav'],
-        bool   $normalizeWhitespace = true
-    ): string
-    {
+        array $elementsToRemove = ['script', 'style', 'link', 'head', 'noscript', 'template', 'svg', 'br', 'hr', 'footer', 'nav'],
+        bool $normalizeWhitespace = true
+    ): string {
         $inputHtml = $normalizeWhitespace
             ? Str::of($html)
                 ->replace('<', ' <')
