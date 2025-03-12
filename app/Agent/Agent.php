@@ -3,8 +3,8 @@
 namespace App\Agent;
 
 use App\Agent\Tool\Tool;
+use Exception;
 use HelgeSverre\Brain\Facades\Brain;
-use Illuminate\Support\Arr;
 
 class Agent
 {
@@ -13,6 +13,8 @@ class Agent
     protected array $intermediateSteps = [];
 
     protected int $currentIteration = 0;
+
+    protected array $toolsSchema = [];
 
     /**
      * @param  array|Tool[]  $tools
@@ -23,6 +25,43 @@ class Agent
         protected int $maxIterations = 10,
         protected ?Hooks $hooks = null,
     ) {
+        $this->prepareToolsSchema();
+    }
+
+    protected function prepareToolsSchema(): void
+    {
+        foreach ($this->tools as $tool) {
+            $parameters = [];
+
+            foreach ($tool->arguments() as $arg) {
+                $parameters[$arg->name] = [
+                    'type' => $this->mapPhpTypeToJsonSchema($arg->type),
+                    'description' => $arg->description ?? '',
+                    'required' => ! $arg->nullable,
+                ];
+            }
+
+            $this->toolsSchema[] = [
+                'name' => $tool->name(),
+                'description' => $tool->description(),
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => $parameters,
+                    'required' => array_keys(array_filter($parameters, fn ($param) => $param['required'])),
+                ],
+            ];
+        }
+    }
+
+    protected function mapPhpTypeToJsonSchema(string $phpType): string
+    {
+        return match ($phpType) {
+            'int', 'integer' => 'integer',
+            'float', 'double' => 'number',
+            'bool', 'boolean' => 'boolean',
+            'array' => 'array',
+            default => 'string'
+        };
     }
 
     public function run(string $task)
@@ -30,11 +69,8 @@ class Agent
         $this->hooks?->trigger('start', $task);
 
         while (! $this->isTaskCompleted) {
-
             $this->trimIntermediateSteps();
-
             $this->currentIteration++;
-
             $this->hooks?->trigger('iteration', $this->currentIteration);
 
             if ($this->currentIteration > $this->maxIterations) {
@@ -51,36 +87,37 @@ class Agent
                 $this->recordStep('thought', $nextStep['thought'] ?? '');
             }
 
-            $this->hooks?->trigger('action', Arr::only($nextStep ?? [], ['action', 'action_input']));
-            $this->recordStep('action', Arr::only($nextStep ?? [], ['action', 'action_input']));
+            if (isset($nextStep['function_call'])) {
+                $toolName = $nextStep['function_call']['name'];
+                $toolInput = $nextStep['function_call']['arguments'] ?? [];
 
-            if ($nextStep['action'] === 'final_answer') {
-                $this->isTaskCompleted = true;
+                $this->hooks?->trigger('action', ['action' => $toolName, 'action_input' => $toolInput]);
+                $this->recordStep('action', ['action' => $toolName, 'action_input' => $toolInput]);
 
-                // TODO: Configurable
-                $evaluation = $this->evaluateTaskCompletion($task);
+                if ($toolName === 'final_answer') {
+                    $this->isTaskCompleted = true;
+                    $evaluation = $this->evaluateTaskCompletion($task);
 
-                if ($evaluation['status'] === 'completed') {
-                    $this->hooks?->trigger('final_answer', $nextStep['action_input']);
+                    if ($evaluation['status'] === 'completed') {
+                        $this->hooks?->trigger('final_answer', $toolInput['answer'] ?? $toolInput);
 
-                    return $nextStep['action_input'];
-                } else {
-                    $this->recordStep('observation', $evaluation['feedback']);
+                        return $toolInput['answer'] ?? $toolInput;
+                    } else {
+                        $this->recordStep('observation', $evaluation['feedback']);
 
-                    continue;
+                        continue;
+                    }
                 }
+
+                $observation = $this->executeTool($toolName, $toolInput);
+                $this->hooks?->trigger('observation', $observation);
+                $this->recordStep('observation', $observation);
             }
-
-            $observation = $this->executeTool($nextStep['action'], $nextStep['action_input']);
-            $this->hooks?->trigger('observation', $observation);
-
-            $this->recordStep('observation', $observation);
         }
     }
 
     protected function executeTool($toolName, $toolInput): ?string
     {
-
         /** @var Tool $tool */
         $tool = collect($this->tools)->first(fn (Tool $tool) => $tool->name() === $toolName);
 
@@ -88,10 +125,13 @@ class Agent
             return "Tool not found: {$toolName}";
         }
 
-        // TODO: Handle exception
         $this->hooks?->trigger('tool_execution', $toolName, $toolInput);
 
-        return $tool->execute($toolInput);
+        try {
+            return $tool->execute($toolInput);
+        } catch (Exception $e) {
+            return "Error executing tool: {$e->getMessage()}";
+        }
     }
 
     protected function evaluateTaskCompletion(string $task)
@@ -104,13 +144,7 @@ class Agent
         )->evaluateTaskCompletion();
 
         $response = Brain::json($prompt);
-
         $this->hooks?->trigger('evaluation', $response);
-
-        // TODO: maybe it makes sense to return this data:
-        //   {"status": "completed", "feedback": "The task is completed !", "tasks": []}
-        //   or
-        //   {"status": "not completed", "feedback": "not all tasks have been completed", "tasks": ["task 1","task 2"]}
 
         return $response;
     }
@@ -133,9 +167,31 @@ class Agent
 
         $this->hooks?->trigger('prompt', $prompt);
 
-        // TODO: Parse, if parse failure, recover with LLM call, if total failure, throw exception
-
-        return Brain::temperature(0.5)->slow()->json($prompt);
+        // Use function calling instead of JSON parsing
+        return Brain::temperature(0.5)
+            ->slow()
+            ->functionCall([
+                'functions' => $this->toolsSchema,
+                'final_answer' => [
+                    'name' => 'final_answer',
+                    'description' => 'Complete the task and provide a final answer',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'answer' => [
+                                'type' => 'string',
+                                'description' => 'The final answer or response to the task',
+                            ],
+                            'thought' => [
+                                'type' => 'string',
+                                'description' => 'Your thinking process behind this answer',
+                            ],
+                        ],
+                        'required' => ['answer'],
+                    ],
+                ],
+            ])
+            ->get($prompt);
     }
 
     protected function recordStep(string $type, mixed $content)

@@ -2,11 +2,6 @@
 
 namespace App\Agent;
 
-use App\Agent\Tool\Tool;
-
-/**
- * @property-read Tool[]|array $tools
- */
 class Prompt
 {
     public function __construct(
@@ -15,7 +10,6 @@ class Prompt
         protected ?array $tools = [],
         protected ?array $intermediateSteps = []
     ) {
-
     }
 
     public static function make(
@@ -35,36 +29,49 @@ class Prompt
     public function decideNextStep(): string
     {
         return $this->combine([
-            $this->goal ? "GOAL: \n{$this->goal}" : '',
-            $this->prepareTask(),
+            '# Agent Task Framework',
+            $this->goal ? "## GOAL\n{$this->goal}" : '',
+            "## TASK\n{$this->task}",
             $this->prepareTools(),
-            $this->prepareResponseFormatInstructions(),
+            $this->prepareSystemInstructions(),
             $this->prepareContext(),
+            '## YOUR NEXT STEPS',
+            '1. Think step-by-step about what you need to do to solve this task',
+            '2. Choose the appropriate tool to use, or provide a final answer if the task is complete',
+            '3. If using a tool, be explicit and exact with the inputs required',
         ]);
     }
 
     public function evaluateTaskCompletion(): string
     {
         return $this->combine([
-            'Consider the task and the following chat history, '
-            .'can the task be considered complete based on the information provided, '
-            .'or are there still unsolved or unfulfilled tasks? think through it step by step, '
-            .'make sure that ALL the requirements are met in the response, event the small details.',
+            '# Task Evaluation Framework',
+            'Consider the task and the conversation history below, determine if the task can be considered complete.',
+            'Evaluate completion based on the following criteria:',
+            '- Have all explicit requirements been fulfilled?',
+            '- Is the solution reasonable and correct?',
+            "- Has the user's intent been satisfied?",
             $this->prepareContext(),
-
-            "Remember: Respond with a JSON object containing the keys: 'status', 'feedback' and tasks.",
-            "The status can be 'completed' or 'not completed'.",
-            'The feedback should be a string explaining why the task is completed or not completed, the feedback should be instructive and helpful.',
-            'The tasks should be an array of strings, each string should be a subtask that is not completed yet, or an empty list if all tasks are completed.',
-            'Your response MUST BE IN JSON and ADHERE TO THE REQUIRED FORMAT:',
-
-            "Task: {$this->task}",
+            '## THE TASK THAT NEEDED TO BE COMPLETED',
+            "{$this->task}",
+            '## EVALUATION INSTRUCTIONS',
+            'Respond with a JSON object that includes:',
+            "- status: 'completed' or 'not completed'",
+            "- feedback: A helpful explanation of why the task is complete or what's still missing",
+            '- tasks: An array of remaining subtasks (empty if completed)',
         ]);
     }
 
-    protected function prepareTask(): string
+    protected function prepareSystemInstructions(): string
     {
-        return "YOUR TASK: {$this->task}";
+        return implode("\n", [
+            '## IMPORTANT GUIDELINES',
+            '- Break complex tasks into steps',
+            '- Use tools when appropriate',
+            '- Provide clear, concise observations',
+            '- Be specific with tool inputs',
+            '- When complete, use the final_answer function with your conclusion',
+        ]);
     }
 
     protected function prepareTools(): ?string
@@ -73,72 +80,58 @@ class Prompt
             return null;
         }
 
-        $toolInstructions = '';
+        $toolInstructions = "## AVAILABLE TOOLS\nYou can use the following tools to complete the task:\n\n";
 
         foreach ($this->tools as $tool) {
-
-            $toolInstructions .= "\n{$tool->name()}: {$tool->description()}\n";
+            $toolInstructions .= "### {$tool->name()}\n";
+            $toolInstructions .= "{$tool->description()}\n\n";
+            $toolInstructions .= "Parameters:\n";
 
             foreach ($tool->arguments() as $arg) {
-                $toolInstructions .= sprintf('- %s (%s): %s', $arg->name, $arg->type, $arg->description ?? '')."\n";
+                $type = $arg->nullable ? "({$arg->type}, optional)" : "({$arg->type}, required)";
+                $toolInstructions .= sprintf("- %s %s: %s\n", $arg->name, $type, $arg->description ?? '');
             }
 
+            $toolInstructions .= "\n";
         }
 
-        $prefix = "AVAILABLE TOOLS (the action_input arguments are provided underneath the tool names, all of the arguments must be provided ): \n";
-
-        return $prefix.trim($toolInstructions);
-    }
-
-    protected function prepareResponseFormatInstructions(): string
-    {
-        return implode("\n", [
-            "Remember: Respond with a JSON object containing the keys: 'thought', 'action' and 'action_input'.",
-            "NOTE: If you are unable to provide an answer or use a tool, return a 'final_answer' action with the action_input 'I don't know'.",
-            "When you are done, respond with the output {'action': 'final_answer', 'action_input': 'final thoughts, instruction or answer'}",
-            'Your response MUST BE IN JSON and ADHERE TO THE REQUIRED FORMAT:',
-        ]);
+        return $toolInstructions;
     }
 
     protected function prepareContext(): ?string
     {
-        $context = [];
-
         if (empty($this->intermediateSteps)) {
             return null;
         }
 
-        $context[] = "STEPS PERFORMED SO FAR: \n";
+        $context = ['## CONVERSATION HISTORY'];
 
         foreach ($this->intermediateSteps as $item) {
-
             if ($item['type'] === 'thought') {
-                $context[] = "Thought: {$item['content']}";
+                $context[] = "**Thought**: {$item['content']}";
 
                 continue;
             }
 
             if ($item['type'] === 'action') {
-                $context[] = "Action: {$item['content']['action']}";
-                $context[] = 'Action Input: '.(is_array($item['content']['action_input'])
-                        ? json_encode($item['content']['action_input'], JSON_PRETTY_PRINT)
-                        : $item['content']['action_input']);
+                $actionName = $item['content']['action'];
+                $actionInput = is_array($item['content']['action_input'])
+                    ? json_encode($item['content']['action_input'], JSON_PRETTY_PRINT)
+                    : $item['content']['action_input'];
+
+                $context[] = "**Action**: {$actionName}";
+                $context[] = "**Action Input**: {$actionInput}";
 
                 continue;
             }
 
-            $line = 'Observation: ';
+            $observation = is_array($item['content'])
+                ? json_encode($item['content'], JSON_PRETTY_PRINT)
+                : $item['content'];
 
-            if (is_array($item['content'])) {
-                $line .= json_encode($item['content'], JSON_PRETTY_PRINT);
-            } else {
-                $line .= $item['content'];
-            }
-
-            $context[] = trim($line);
-
+            $context[] = "**Observation**: {$observation}";
         }
 
-        return implode("\n", $context);
+        return implode("\n\n", $context);
     }
 }
