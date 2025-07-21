@@ -53,8 +53,8 @@ class RunAgent extends Command
 
             $params = '';
             if (! empty($action['action_input'])) {
-                if (isset($action['action_input']['query'])) {
-                    $params = ' <fg=gray>"'.Str::limit($action['action_input']['query'], 40).'"</>';
+                if (isset($action['action_input']['searchTerm'])) {
+                    $params = ' <fg=gray>"'.Str::limit($action['action_input']['searchTerm'], 40).'"</>';
                 } elseif (isset($action['action_input']['url'])) {
                     $params = ' <fg=gray>'.parse_url($action['action_input']['url'], PHP_URL_HOST).'</>';
                 } elseif (isset($action['action_input']['file_path'])) {
