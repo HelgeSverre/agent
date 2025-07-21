@@ -9,7 +9,5 @@ readonly class ToolArgument
         public string $type,
         public bool $nullable = false,
         public ?string $description = null,
-    ) {
-
-    }
+    ) {}
 }

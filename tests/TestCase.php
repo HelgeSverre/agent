@@ -14,6 +14,7 @@ class TestCase extends Orchestra
         return [
             AppServiceProvider::class,
             LaravelServiceProvider::class,
+            \OpenAI\Laravel\ServiceProvider::class,
         ];
     }
 
@@ -33,5 +34,9 @@ class TestCase extends Orchestra
         config()->set('imap.accounts.default.username', env('IMAP_USERNAME'));
         config()->set('imap.accounts.default.password', env('IMAP_PASSWORD'));
         config()->set('imap.accounts.default.protocol', env('IMAP_PROTOCOL'));
+
+        // Configure OpenAI
+        config()->set('openai.api_key', env('OPENAI_API_KEY'));
+        config()->set('openai.organization', env('OPENAI_ORGANIZATION'));
     }
 }

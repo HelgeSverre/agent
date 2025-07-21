@@ -9,8 +9,7 @@ class Prompt
         protected ?string $goal,
         protected ?array $tools = [],
         protected ?array $intermediateSteps = []
-    ) {
-    }
+    ) {}
 
     public static function make(
         string $task,
@@ -58,7 +57,7 @@ class Prompt
             'Respond with a JSON object that includes:',
             "- status: 'completed' or 'not completed'",
             "- feedback: A helpful explanation of why the task is complete or what's still missing",
-            '- tasks: An array of remaining subtasks (empty if completed)',
+            '- tasks: An array of strings of remaining subtasks (empty if completed)',
         ]);
     }
 

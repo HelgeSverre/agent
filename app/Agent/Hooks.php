@@ -6,13 +6,15 @@ use Closure;
 
 class Hooks
 {
-    public function __construct(protected array $listeners = [])
-    {
-    }
+    public function __construct(protected array $listeners = []) {}
 
     public function on(string $event, Closure $callback): self
     {
-        $this->listeners[$event] = $callback;
+        if (! isset($this->listeners[$event])) {
+            $this->listeners[$event] = [];
+        }
+
+        $this->listeners[$event][] = $callback;
 
         return $this;
     }
@@ -31,7 +33,9 @@ class Hooks
         }
 
         if (isset($this->listeners[$event])) {
-            ($this->listeners[$event])(...$args);
+            foreach ($this->listeners[$event] as $callback) {
+                $callback(...$args);
+            }
         }
     }
 }

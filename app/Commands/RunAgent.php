@@ -14,7 +14,7 @@ use LaravelZero\Framework\Commands\Command;
 
 class RunAgent extends Command
 {
-    protected $signature = 'run {task?}';
+    protected $signature = 'run {task?} {--speak : Speak the final answer using the system\'s text-to-speech}';
 
     public function handle(): void
     {
@@ -26,67 +26,81 @@ class RunAgent extends Command
 
         $wrap = 120;
 
-        $hooks = new Hooks([
-            'start' => function ($task) {
-                $this->newLine(2);
-                $this->line(str_pad(' TASK', 120), 'fg=black;bg=bright-cyan');
-                $this->newLine();
-                $this->line('<fg=cyan>'.wordwrap($task, 80).'</>');
-            },
-            'iteration' => function ($iteration) {
-                $this->newLine(2);
-                $this->line(str_pad(' ITERATION', 120), 'fg=black;bg=bright-white');
-                $this->newLine();
-                $this->line("Step: {$iteration}");
-            },
-            'tool_execution' => function ($tool, $args) {
-                $this->newLine(2);
-                $this->line(str_pad(' TOOL EXECUTION', 120), 'fg=black;bg=bright-yellow');
-                $this->newLine();
-                $this->line("Tool name: {$tool}");
-                $this->line('Tool Arguments:');
-                $this->line(json_encode($args, JSON_PRETTY_PRINT));
-            },
-            'thought' => function ($thought) {
-                $this->newLine(2);
-                $this->line(str_pad(' THOUGHT', 120), 'fg=black;bg=bright-blue');
-                $this->newLine();
-                $this->line('<fg=blue>'.wordwrap($thought, 80).'</>');
-            },
-            'observation' => function ($observation) use ($wrap) {
-                $this->newLine(2);
-                $this->line(str_pad(' OBSERVATION', 120), 'fg=black;bg=bright-red');
-                $this->newLine();
-                $this->line('<fg=magenta>'.Str::limit(wordwrap($observation, 80), $wrap * 20).'</>');
-            },
-            'evaluation' => function ($eval) use ($wrap) {
-                $this->newLine(2);
-                $this->line(str_pad(' EVALUATION', 120), 'fg=green;bg=black');
-                $this->newLine();
-                $this->line('<fg=magenta>'.Str::limit(wordwrap($eval['feedback'], 80), $wrap * 10).'</>');
+        $hooks = new Hooks();
+        
+        $hooks->on('start', function ($task) {
+            $this->newLine();
+            $this->line(str_pad(' TASK', 120), 'fg=black;bg=bright-cyan');
+            $this->line('<fg=cyan>'.wordwrap($task, 80).'</>');
+        });
+        
+        $hooks->on('iteration', function ($iteration) {
+            $this->newLine();
+            $this->line(str_pad(' ITERATION', 120), 'fg=black;bg=bright-white');
+            $this->line("Step: {$iteration}");
+        });
+        
+        $hooks->on('action', function ($action) {
+            $this->newLine();
+            $this->line(str_pad(' TOOL EXECUTION', 120), 'fg=black;bg=bright-yellow');
+            $this->line("Tool: {$action['action']}");
+            $this->line('Args:');
+            $this->line(json_encode($action['action_input'] ?? [], JSON_PRETTY_PRINT));
+        });
+        
+        $hooks->on('thought', function ($thought) {
+            $this->newLine();
+            $this->line(str_pad(' THOUGHT', 120), 'fg=black;bg=bright-blue');
+            $this->line('<fg=blue>'.wordwrap($thought, 80).'</>');
+        });
+        
+        $hooks->on('observation', function ($observation) use ($wrap) {
+            //                $this->newLine();
+            //                $this->line(str_pad(' OBSERVATION', 120), 'fg=black;bg=bright-red');
+            //                $this->newLine();
+            $this->line('<fg=gray>'.Str::limit(wordwrap($observation, 80), $wrap * 4).'</>');
+        });
+        
+        $hooks->on('evaluation', function ($eval) use ($wrap) {
+            $this->newLine();
+            $this->line(str_pad(' EVALUATION', 120), 'fg=green;bg=black');
+            $this->newLine();
+            
+            if (!$eval) {
+                $this->line('<fg=red>Evaluation failed - no response from LLM</>');
+                return;
+            }
+            
+            $this->line('<fg=magenta>'.Str::limit(wordwrap($eval['feedback'] ?? 'No feedback', 80), $wrap * 10).'</>');
 
+            if (filled($eval['tasks'])) {
+                $this->newLine();
+                $this->line(str_pad(' EVALUATION - TASKS REMAINING', 120), 'fg=green;bg=green');
+                $this->newLine();
                 foreach ($eval['tasks'] as $task) {
                     $this->line('<fg=magenta>    - '.Str::limit(wordwrap($task, 80), $wrap * 10).'</>');
                 }
-            },
-            'final_answer' => function ($finalAnswer) use ($wrap) {
-                $this->newLine(2);
-                $this->line(str_pad(' FINAL ANSWER', 120), 'fg=blue;bg=black');
-                $this->newLine();
-                $this->line(wordwrap($finalAnswer, $wrap));
-            },
-        ]);
+            }
+        });
+        
+        $hooks->on('final_answer', function ($finalAnswer) use ($wrap) {
+            $this->newLine();
+            $this->line(str_pad(' FINAL ANSWER', 120), 'fg=black;bg=bright-yellow');
+            $this->newLine();
+            
+            $this->line(wordwrap($finalAnswer, $wrap));
+        });
 
         $agent = new Agent(
             tools: [
-                new ReadFileTool(),
+                new ReadFileTool,
                 new WriteFileTool(base_path('output')),
-                new SearchWebTool(),
-                new BrowseWebsiteTool(),
-                new RunCommandTool(),
-                //                new SearchEmailTool(),
-                //                new SummarizeConversationHistoryTool(),
-                //                new CreateDraftEmailTool(),
+                new SearchWebTool,
+                new BrowseWebsiteTool,
+                new RunCommandTool,
+                // new SearchEmailTool(),
+                // new SummarizeConversationHistoryTool(),
+                // new CreateDraftEmailTool(),
             ],
             goal: 'Current date:'.date('Y-m-d')."\n".
             'Respond to the human as helpfully and accurately as possible.'.
@@ -94,8 +108,11 @@ class RunAgent extends Command
             hooks: $hooks,
         );
 
-        $finalResponse = $agent->run('summarize the first 3 articles on hackernews, and write them to a file,
-        note that you can also use the browse command to browse the website and the links therein, find the first 3 article links and visit the page it links to and write a summary for the entire content instead of the excerpt .');
+        $finalResponse = $agent->run($task);
 
+        // For fun.
+        if ($this->option('speak')) {
+            shell_exec('say '.escapeshellarg(Str::of($finalResponse)->replace("\n", ' ')->trim()));
+        }
     }
 }

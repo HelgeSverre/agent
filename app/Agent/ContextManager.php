@@ -15,8 +15,7 @@ class ContextManager
     public function __construct(
         protected string $agentId,
         protected ?Hooks $hooks = null,
-    ) {
-    }
+    ) {}
 
     public function getContext(array $currentSteps = []): array
     {

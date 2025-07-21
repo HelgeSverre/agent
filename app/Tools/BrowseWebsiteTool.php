@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Http;
 
 class BrowseWebsiteTool extends Tool
 {
-    protected string $name = 'Browse Website';
+    protected string $name = 'browse_website';
 
     protected string $description = 'Get the contents of a website';
 

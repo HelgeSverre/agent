@@ -9,8 +9,7 @@ class TrelloService
     public function __construct(
         protected string $apiKey,
         protected string $apiToken
-    ) {
-    }
+    ) {}
 
     protected function sendRequest($endpoint, $params = [])
     {

@@ -4,7 +4,6 @@ namespace App\Agent;
 
 use App\Agent\Tool\Tool;
 use Exception;
-use HelgeSverre\Brain\Facades\Brain;
 
 class Agent
 {
@@ -37,7 +36,6 @@ class Agent
                 $parameters[$arg->name] = [
                     'type' => $this->mapPhpTypeToJsonSchema($arg->type),
                     'description' => $arg->description ?? '',
-                    'required' => ! $arg->nullable,
                 ];
             }
 
@@ -47,7 +45,7 @@ class Agent
                 'parameters' => [
                     'type' => 'object',
                     'properties' => $parameters,
-                    'required' => array_keys(array_filter($parameters, fn ($param) => $param['required'])),
+                    'required' => array_values(array_map(fn ($arg) => $arg->name, array_filter($tool->arguments(), fn ($arg) => ! $arg->nullable))),
                 ],
             ];
         }
@@ -60,6 +58,7 @@ class Agent
             'float', 'double' => 'number',
             'bool', 'boolean' => 'boolean',
             'array' => 'array',
+            'object' => 'object',
             default => 'string'
         };
     }
@@ -98,12 +97,14 @@ class Agent
                     $this->isTaskCompleted = true;
                     $evaluation = $this->evaluateTaskCompletion($task);
 
-                    if ($evaluation['status'] === 'completed') {
+                    if ($evaluation && isset($evaluation['status']) && $evaluation['status'] === 'completed') {
                         $this->hooks?->trigger('final_answer', $toolInput['answer'] ?? $toolInput);
 
                         return $toolInput['answer'] ?? $toolInput;
                     } else {
-                        $this->recordStep('observation', $evaluation['feedback']);
+                        $feedback = $evaluation['feedback'] ?? 'Failed to evaluate task completion';
+                        $this->recordStep('observation', $feedback);
+                        $this->isTaskCompleted = false; // Reset so agent continues
 
                         continue;
                     }
@@ -143,7 +144,7 @@ class Agent
             intermediateSteps: $this->intermediateSteps,
         )->evaluateTaskCompletion();
 
-        $response = Brain::json($prompt);
+        $response = LLM::json($prompt);
         $this->hooks?->trigger('evaluation', $response);
 
         return $response;
@@ -168,30 +169,35 @@ class Agent
         $this->hooks?->trigger('prompt', $prompt);
 
         // Use function calling instead of JSON parsing
-        return Brain::temperature(0.5)
-            ->slow()
-            ->functionCall([
-                'functions' => $this->toolsSchema,
-                'final_answer' => [
-                    'name' => 'final_answer',
-                    'description' => 'Complete the task and provide a final answer',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'answer' => [
-                                'type' => 'string',
-                                'description' => 'The final answer or response to the task',
-                            ],
-                            'thought' => [
-                                'type' => 'string',
-                                'description' => 'Your thinking process behind this answer',
-                            ],
+        $result = LLM::functionCall([
+            'functions' => $this->toolsSchema,
+            'final_answer' => [
+                'name' => 'final_answer',
+                'description' => 'Complete the task and provide a final answer',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'answer' => [
+                            'type' => 'string',
+                            'description' => 'The final answer or response to the task',
                         ],
-                        'required' => ['answer'],
+                        'thought' => [
+                            'type' => 'string',
+                            'description' => 'Your thinking process behind this answer',
+                        ],
                     ],
+                    'required' => ['answer'],
                 ],
-            ])
+            ],
+        ])
             ->get($prompt);
+
+        // Debug logging
+        if (isset($result['error'])) {
+            $this->hooks?->trigger('observation', 'Function call error: '.$result['error']);
+        }
+
+        return $result;
     }
 
     protected function recordStep(string $type, mixed $content)

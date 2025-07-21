@@ -22,9 +22,7 @@ abstract class Tool
                 protected string $name,
                 protected string $description,
                 protected Closure $closure,
-            ) {
-
-            }
+            ) {}
 
             public function name(): string
             {
@@ -95,7 +93,7 @@ abstract class Tool
             $arguments[] = new ToolArgument(
                 name: $param->getName(),
                 type: $param->getType()?->getName() ?? 'string',
-                nullable: $param->allowsNull(),
+                nullable: $param->allowsNull() || $param->isDefaultValueAvailable(),
                 description: $attribute?->newInstance()->description ?? null
             );
         }

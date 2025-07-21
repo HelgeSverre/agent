@@ -25,6 +25,12 @@ class ReadFileTool extends Tool
 
         $path = $this->baseDir.'/'.$filename;
 
-        return 'File contents: '.$path;
+        if (! file_exists($path)) {
+            return "Error: File not found at {$path}";
+        }
+
+        $contents = file_get_contents($path);
+
+        return "File contents:\n\n{$contents}";
     }
 }

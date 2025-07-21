@@ -12,9 +12,7 @@ class ErrorRecovery
         'tool_execution_error' => 'There was an error executing the tool. Let me try a different approach.',
     ];
 
-    public function __construct(protected ?Hooks $hooks = null)
-    {
-    }
+    public function __construct(protected ?Hooks $hooks = null) {}
 
     public function handleError(string $errorType, string $errorDetails, callable $retryFunction, int $currentRetry = 0): mixed
     {
