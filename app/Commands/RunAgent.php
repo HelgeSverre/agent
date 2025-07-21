@@ -26,20 +26,20 @@ class RunAgent extends Command
 
         $wrap = 120;
 
-        $hooks = new Hooks();
-        
+        $hooks = new Hooks;
+
         $hooks->on('start', function ($task) {
             $this->newLine();
-            $this->line('<fg=cyan>◆</> <fg=white;options=bold>Task:</> <fg=cyan>' . $task . '</>');
+            $this->line('<fg=cyan>◆</> <fg=white;options=bold>Task:</> <fg=cyan>'.$task.'</>');
             $this->newLine();
         });
-        
+
         $hooks->on('iteration', function ($iteration) {
             // Silent - just track the iteration number internally
         });
-        
+
         $hooks->on('action', function ($action) {
-            $icon = match($action['action']) {
+            $icon = match ($action['action']) {
                 'search_web' => '<fg=blue>⬡</>',
                 'browse_website' => '<fg=green>⬢</>',
                 'read_file' => '<fg=yellow>⬣</>',
@@ -48,42 +48,44 @@ class RunAgent extends Command
                 'final_answer' => '<fg=green>✓</>',
                 default => '<fg=gray>•</>'
             };
-            
+
             $params = '';
-            if (!empty($action['action_input'])) {
+            if (! empty($action['action_input'])) {
                 if (isset($action['action_input']['query'])) {
-                    $params = ' <fg=gray>"' . Str::limit($action['action_input']['query'], 40) . '"</>';
+                    $params = ' <fg=gray>"'.Str::limit($action['action_input']['query'], 40).'"</>';
                 } elseif (isset($action['action_input']['url'])) {
-                    $params = ' <fg=gray>' . parse_url($action['action_input']['url'], PHP_URL_HOST) . '</>';
+                    $params = ' <fg=gray>'.parse_url($action['action_input']['url'], PHP_URL_HOST).'</>';
                 } elseif (isset($action['action_input']['file_path'])) {
-                    $params = ' <fg=gray>' . basename($action['action_input']['file_path']) . '</>';
+                    $params = ' <fg=gray>'.basename($action['action_input']['file_path']).'</>';
                 }
             }
-            
-            $this->line($icon . ' ' . $action['action'] . $params);
+
+            $this->line($icon.' '.$action['action'].$params);
         });
-        
+
         $hooks->on('thought', function ($thought) {
-            $this->line('<fg=blue>◈</> <fg=gray>' . Str::limit($thought, 100) . '</>');
+            $this->line('<fg=blue>◈</> <fg=gray>'.Str::limit($thought, 100).'</>');
         });
-        
-        $hooks->on('observation', function ($observation) use ($wrap) {
+
+        $hooks->on('observation', function ($observation) {
             if (strlen($observation) > 200) {
-                $this->line('  <fg=gray>└─ ' . Str::limit($observation, 80) . '...</>');
+                $this->line('  <fg=gray>└─ '.Str::limit($observation, 80).'...</>');
             }
         });
-        
-        $hooks->on('evaluation', function ($eval) use ($wrap) {
-            if (!$eval) return;
-            
+
+        $hooks->on('evaluation', function ($eval) {
+            if (! $eval) {
+                return;
+            }
+
             if (isset($eval['status']) && $eval['status'] === 'completed') {
-                $this->line('<fg=green>◉</> <fg=green>' . ($eval['feedback'] ?? 'Completed') . '</>');
+                $this->line('<fg=green>◉</> <fg=green>'.($eval['feedback'] ?? 'Completed').'</>');
             }
         });
-        
+
         $hooks->on('final_answer', function ($finalAnswer) use ($wrap) {
             $this->newLine();
-            $this->line('<fg=green>✓</> <fg=white;options=bold>Answer:</> ' . wordwrap($finalAnswer, $wrap));
+            $this->line('<fg=green>✓</> <fg=white;options=bold>Answer:</> '.wordwrap($finalAnswer, $wrap));
             $this->newLine();
         });
 

@@ -1,11 +1,16 @@
 <p align="center"><img src="./art/header.png"></p>
 
-# Agent - Library for building AI agents in PHP
+# Agent - AI Agent Framework for PHP
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/helgesverre/agent.svg?style=flat-square)](https://packagist.org/packages/helgesverre/agent)
 [![Total Downloads](https://img.shields.io/packagist/dt/helgesverre/agent.svg?style=flat-square)](https://packagist.org/packages/helgesverre/agent)
+[![License](https://img.shields.io/github/license/helgesverre/agent.svg?style=flat-square)](https://github.com/helgesverre/agent/blob/main/LICENSE.md)
 
-A PHP library for building AI agents with tool calling capabilities using OpenAI's function calling API.
+A Laravel Zero-based CLI application for building and running AI agents with tool calling capabilities using OpenAI's
+function calling API.
+
+> Note: This is mostly meant as a playground for my own experimentation, don't use this for anything serious, i will
+> likely break your shit eventually.
 
 ## See it in action
 
@@ -13,18 +18,14 @@ A PHP library for building AI agents with tool calling capabilities using OpenAI
 
 Video Link: https://share.cleanshot.com/kTZXyFnY
 
-## Requirements
-
-- PHP 8.1 or higher
-- OpenAI API key
-- Laravel framework (for facades and service providers)
-
 ## Installation
 
-Install it via composer:
+Clone the repository and install dependencies:
 
 ```bash
-composer require helgesverre/agent
+git clone https://github.com/helgesverre/agent.git
+cd agent
+composer install
 ```
 
 ## Configuration
@@ -37,19 +38,46 @@ OPENAI_API_KEY=your-api-key-here
 
 ## Key Features
 
-- **Function Calling**: Structured interaction with tools through JSON schema
+- **Function Calling**: Native OpenAI function calling API integration
 - **Error Recovery**: Graceful handling of failures with automatic retries
 - **Enhanced Prompting**: Markdown-based prompts for better model comprehension
-- **Planning Capabilities**: Task decomposition and execution monitoring
-- **Context Management**: Efficient memory system for extended conversations
-
-### Coming Soon
-- **Dynamic Model Selection**: Choose the right model for each task type
-- **Multi-Agent Crews**: Collaborate across multiple specialized agents
+- **Context Management**: Automatic conversation history tracking
+- **Minimal Terminal Display**: Clean, colored symbol-based output
+- **Hook System**: Monitor and customize agent behavior in real-time
+- **Built-in Tools**: Web search, website browsing, file I/O, and command execution
 
 ## Quick Start Guide
 
-### Basic Agent
+### Running the Agent CLI
+
+```bash
+# Run with a task
+php agent run "Write a hello world message to a file"
+
+# Interactive mode - will prompt for task
+php agent run
+
+# Enable text-to-speech for the final answer (macOS only)
+php agent run "What is the weather today?" --speak
+```
+
+### More Examples
+
+```bash
+# Search for information
+php agent run "Find the latest PHP 8.3 features and summarize them"
+
+# File operations
+php agent run "Create a markdown file with today's date and a todo list template"
+
+# Web research
+php agent run "Search for the top 3 PHP frameworks in 2024 and compare them"
+
+# System information
+php agent run "Check the current PHP version and list installed extensions"
+```
+
+### Basic Agent Usage
 
 ```php
 use App\Agent\Agent;
@@ -84,23 +112,39 @@ $result = $agent->run('Write a hello world message to a file called hello.txt');
 echo "Final result: $result\n";
 ```
 
+### CLI Output
 
-### Model Configuration
+The agent uses a minimal display with colored symbols:
 
-Currently, the agent uses OpenAI's API with a hardcoded model. The model can be changed by modifying the constant in `App\Agent\LLM`:
+- ◆ Task announcement (cyan)
+- ◈ Agent thoughts (blue)
+- ⬡ Web search (blue hexagon)
+- ⬢ Browse website (green hexagon)
+- ⬣ Read file (yellow hexagon)
+- ⬤ Write file (magenta circle)
+- ⬥ Run command (cyan diamond)
+- ◉ Task evaluation (green circle)
+- ✓ Final answer (green checkmark)
 
-```php
-// In App\Agent\LLM
-const model = 'gpt-4.1-mini'; // Change this to your preferred model
+Example output:
+
 ```
+◆ Task: find a simple recipe for pasta
 
-> **Note**: Dynamic model selection is planned for a future release.
+⬡ search_web
+  └─ [...results...]
+⬢ browse_website www.example.com
+◉ The user requested a simple pasta recipe...
+
+✓ Answer: Here's a simple pasta recipe...
+```
 
 ## Creating Custom Tools
 
 Tools are the building blocks of agent capabilities. Here's how to create a custom tool:
 
 ### Important: Tool Naming Requirements
+
 - Tool names must match the pattern `^[a-zA-Z0-9_-]+$`
 - Use underscores or hyphens instead of spaces
 - Examples: `get_weather`, `search_web`, `read-file`
@@ -133,6 +177,29 @@ class WeatherTool extends Tool
     private function fetchWeatherData(string $location): string {
         // Actual API implementation...
         return "sunny, 25°C";
+    }
+}
+```
+
+### Example: Adding a Database Query Tool
+
+```php
+class DatabaseQueryTool extends Tool
+{
+    protected string $name = 'query_database';
+    protected string $description = 'Execute safe read-only database queries';
+    
+    public function run(
+        #[Description('The SQL query to execute (SELECT only)')]
+        string $query
+    ): string {
+        // Validate it's a SELECT query
+        if (!str_starts_with(strtoupper(trim($query)), 'SELECT')) {
+            return "Error: Only SELECT queries are allowed";
+        }
+        
+        // Execute query...
+        return json_encode($results);
     }
 }
 ```
@@ -240,45 +307,6 @@ $agent = new Agent(
 // Context is automatically trimmed to last 5 steps to manage token usage
 ```
 
-## Multi-Agent Collaboration (Coming Soon)
-
-> **Note**: Multi-agent crew functionality is planned for a future release. This section shows the intended API.
-
-The framework will support multi-agent crews for complex task collaboration:
-
-```php
-// PLANNED FEATURE - NOT YET IMPLEMENTED
-use App\Agent\Agent;
-use App\Agent\Crew\Crew;
-
-// Create specialist agents
-$researchAgent = new Agent(
-    tools: [new SearchWebTool(), new BrowseWebsiteTool()],
-    goal: 'Research information thoroughly and accurately'
-);
-
-$writerAgent = new Agent(
-    tools: [new WriteFileTool(), new ReadFileTool()],
-    goal: 'Create well-organized, comprehensive documents'
-);
-
-// Define tasks
-$tasks = [
-    new ResearchTask('Find current information about AI agents'),
-    new CompilationTask('Create a comprehensive report'),
-];
-
-// Create the crew
-$crew = new Crew(
-    tasks: $tasks,
-    agents: [$researchAgent, $writerAgent],
-);
-
-// Execute all tasks in sequence
-$result = $crew->executeTasks();
-```
-
-
 ## Hooks System
 
 The hooks system allows monitoring and customizing agent behavior:
@@ -298,12 +326,13 @@ $hooks->on('tool_execution', function($toolName, $args) {
 });
 
 // Available hook events:
-// - 'thought': When the agent has a thought
-// - 'prompt': Before sending prompt to LLM
-// - 'action': When executing a tool
-// - 'observation': Tool execution results
-// - 'evaluation': Task completion evaluation
-// - 'final_answer': When task is complete
+// - 'start': When task begins
+// - 'iteration': New step number
+// - 'thought': Agent reasoning
+// - 'action': Tool execution
+// - 'observation': Tool results
+// - 'evaluation': Progress check
+// - 'final_answer': Task complete
 ```
 
 ## Task Evaluation
@@ -341,12 +370,11 @@ $result = $agent->run('Create a summary of recent tech news');
 
 The framework includes several built-in tools:
 
-- **SearchWebTool** (`search_web`): Search the web for information
-- **BrowseWebsiteTool** (`browse_website`): Navigate and extract content from websites
-- **ReadFileTool** (`read_file`): Read file contents
-- **WriteFileTool** (`write_file`): Create or update files
-- **RunCommandTool** (`run_command`): Execute system commands
-- **EmailToolkit**: Send, read, and manage email communications (if enabled)
+- **SearchWebTool** (`search_web`): Search the web for information using DuckDuckGo
+- **BrowseWebsiteTool** (`browse_website`): Extract text content from websites
+- **ReadFileTool** (`read_file`): Read file contents from the output directory
+- **WriteFileTool** (`write_file`): Create or update files in the output directory
+- **RunCommandTool** (`run_command`): Execute system commands safely
 
 ## Advanced Configuration
 
@@ -376,35 +404,24 @@ class CustomPrompt extends Prompt
 // and override the decideNextStep method to use your custom prompt
 ```
 
+### Model Configuration
+
+The agent uses OpenAI's API. You can configure the model by setting the constant in `App\Agent\LLM`:
+
+```php
+// In App\Agent\LLM
+const model = 'gpt-4o-mini'; // Default model
+```
+
 ### FunctionCallBuilder
 
 The `FunctionCallBuilder` class handles the interaction with OpenAI's function calling API:
 
 ```php
 use App\Agent\LLM;
-use App\Agent\FunctionCallBuilder;
 
-// Create a function call builder with tool schemas
-$builder = LLM::functionCall([
-    'functions' => $toolSchemas,
-    'final_answer' => [
-        'name' => 'final_answer',
-        'description' => 'Complete the task and provide a final answer',
-        'parameters' => [
-            'type' => 'object',
-            'properties' => [
-                'answer' => [
-                    'type' => 'string',
-                    'description' => 'The final answer or response to the task',
-                ],
-            ],
-            'required' => ['answer'],
-        ],
-    ],
-]);
-
-// Execute with a prompt
-$result = $builder->get($prompt);
+// The Agent class automatically uses function calling:
+$result = LLM::functionCall($tools)->get($prompt);
 
 // Result structure:
 // [
@@ -416,6 +433,25 @@ $result = $builder->get($prompt);
 // ]
 ```
 
+### Testing
+
+The project includes comprehensive tests:
+
+```bash
+# Run all tests
+composer test
+
+# Run specific test suite
+composer test -- --filter=AgentTest
+```
+
+## Limitations
+
+- Cannot modify files outside the designated output directory
+- Web browsing extracts text only (no JavaScript execution)
+- Command execution is sandboxed for safety
+- Context window limits long conversations
+- No persistent memory between sessions
 
 ## License
 
