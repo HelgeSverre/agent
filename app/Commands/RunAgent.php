@@ -30,65 +30,61 @@ class RunAgent extends Command
         
         $hooks->on('start', function ($task) {
             $this->newLine();
-            $this->line(str_pad(' TASK', 120), 'fg=black;bg=bright-cyan');
-            $this->line('<fg=cyan>'.wordwrap($task, 80).'</>');
+            $this->line('<fg=cyan>◆</> <fg=white;options=bold>Task:</> <fg=cyan>' . $task . '</>');
+            $this->newLine();
         });
         
         $hooks->on('iteration', function ($iteration) {
-            $this->newLine();
-            $this->line(str_pad(' ITERATION', 120), 'fg=black;bg=bright-white');
-            $this->line("Step: {$iteration}");
+            // Silent - just track the iteration number internally
         });
         
         $hooks->on('action', function ($action) {
-            $this->newLine();
-            $this->line(str_pad(' TOOL EXECUTION', 120), 'fg=black;bg=bright-yellow');
-            $this->line("Tool: {$action['action']}");
-            $this->line('Args:');
-            $this->line(json_encode($action['action_input'] ?? [], JSON_PRETTY_PRINT));
+            $icon = match($action['action']) {
+                'search_web' => '<fg=blue>⬡</>',
+                'browse_website' => '<fg=green>⬢</>',
+                'read_file' => '<fg=yellow>⬣</>',
+                'write_file' => '<fg=magenta>⬤</>',
+                'run_command' => '<fg=cyan>⬥</>',
+                'final_answer' => '<fg=green>✓</>',
+                default => '<fg=gray>•</>'
+            };
+            
+            $params = '';
+            if (!empty($action['action_input'])) {
+                if (isset($action['action_input']['query'])) {
+                    $params = ' <fg=gray>"' . Str::limit($action['action_input']['query'], 40) . '"</>';
+                } elseif (isset($action['action_input']['url'])) {
+                    $params = ' <fg=gray>' . parse_url($action['action_input']['url'], PHP_URL_HOST) . '</>';
+                } elseif (isset($action['action_input']['file_path'])) {
+                    $params = ' <fg=gray>' . basename($action['action_input']['file_path']) . '</>';
+                }
+            }
+            
+            $this->line($icon . ' ' . $action['action'] . $params);
         });
         
         $hooks->on('thought', function ($thought) {
-            $this->newLine();
-            $this->line(str_pad(' THOUGHT', 120), 'fg=black;bg=bright-blue');
-            $this->line('<fg=blue>'.wordwrap($thought, 80).'</>');
+            $this->line('<fg=blue>◈</> <fg=gray>' . Str::limit($thought, 100) . '</>');
         });
         
         $hooks->on('observation', function ($observation) use ($wrap) {
-            //                $this->newLine();
-            //                $this->line(str_pad(' OBSERVATION', 120), 'fg=black;bg=bright-red');
-            //                $this->newLine();
-            $this->line('<fg=gray>'.Str::limit(wordwrap($observation, 80), $wrap * 4).'</>');
+            if (strlen($observation) > 200) {
+                $this->line('  <fg=gray>└─ ' . Str::limit($observation, 80) . '...</>');
+            }
         });
         
         $hooks->on('evaluation', function ($eval) use ($wrap) {
-            $this->newLine();
-            $this->line(str_pad(' EVALUATION', 120), 'fg=green;bg=black');
-            $this->newLine();
+            if (!$eval) return;
             
-            if (!$eval) {
-                $this->line('<fg=red>Evaluation failed - no response from LLM</>');
-                return;
-            }
-            
-            $this->line('<fg=magenta>'.Str::limit(wordwrap($eval['feedback'] ?? 'No feedback', 80), $wrap * 10).'</>');
-
-            if (filled($eval['tasks'])) {
-                $this->newLine();
-                $this->line(str_pad(' EVALUATION - TASKS REMAINING', 120), 'fg=green;bg=green');
-                $this->newLine();
-                foreach ($eval['tasks'] as $task) {
-                    $this->line('<fg=magenta>    - '.Str::limit(wordwrap($task, 80), $wrap * 10).'</>');
-                }
+            if (isset($eval['status']) && $eval['status'] === 'completed') {
+                $this->line('<fg=green>◉</> <fg=green>' . ($eval['feedback'] ?? 'Completed') . '</>');
             }
         });
         
         $hooks->on('final_answer', function ($finalAnswer) use ($wrap) {
             $this->newLine();
-            $this->line(str_pad(' FINAL ANSWER', 120), 'fg=black;bg=bright-yellow');
+            $this->line('<fg=green>✓</> <fg=white;options=bold>Answer:</> ' . wordwrap($finalAnswer, $wrap));
             $this->newLine();
-            
-            $this->line(wordwrap($finalAnswer, $wrap));
         });
 
         $agent = new Agent(
