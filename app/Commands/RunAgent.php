@@ -8,6 +8,7 @@ use App\Tools\BrowseWebsiteTool;
 use App\Tools\ReadFileTool;
 use App\Tools\RunCommandTool;
 use App\Tools\SearchWebTool;
+use App\Tools\SpeakTool;
 use App\Tools\WriteFileTool;
 use Illuminate\Support\Str;
 use LaravelZero\Framework\Commands\Command;
@@ -43,9 +44,10 @@ class RunAgent extends Command
                 'search_web' => '<fg=blue>⬡</>',
                 'browse_website' => '<fg=green>⬢</>',
                 'read_file' => '<fg=yellow>⬣</>',
-                'write_file' => '<fg=magenta>⬤</>',
+                'write_file' => '<fg=magenta>»</>',
                 'run_command' => '<fg=cyan>⬥</>',
                 'final_answer' => '<fg=green>✓</>',
+                'speak' => '<fg=yellow>▶</>',
                 default => '<fg=gray>•</>'
             };
 
@@ -57,6 +59,8 @@ class RunAgent extends Command
                     $params = ' <fg=gray>'.parse_url($action['action_input']['url'], PHP_URL_HOST).'</>';
                 } elseif (isset($action['action_input']['file_path'])) {
                     $params = ' <fg=gray>'.basename($action['action_input']['file_path']).'</>';
+                } elseif (isset($action['action_input']['filename'])) {
+                    $params = ' <fg=gray>'.$action['action_input']['filename'].'</>';
                 }
             }
 
@@ -83,6 +87,12 @@ class RunAgent extends Command
             }
         });
 
+        $hooks->on('max_iteration', function ($current, $mac) {
+            $this->newLine();
+            $this->line('<fg=red>✗</> <fg=white;options=bold>Max iterations reached:</>  <fg=red>'.$mac.'</> after <fg=yellow>'.$current.'</> iterations.');
+            $this->newLine();
+        });
+
         $hooks->on('final_answer', function ($finalAnswer) use ($wrap) {
             $this->newLine();
             $this->line('<fg=green>✓</> <fg=white;options=bold>Answer:</> '.wordwrap($finalAnswer, $wrap));
@@ -96,13 +106,12 @@ class RunAgent extends Command
                 new SearchWebTool,
                 new BrowseWebsiteTool,
                 new RunCommandTool,
-                // new SearchEmailTool(),
-                // new SummarizeConversationHistoryTool(),
-                // new CreateDraftEmailTool(),
+                new SpeakTool,
             ],
             goal: 'Current date:'.date('Y-m-d')."\n".
             'Respond to the human as helpfully and accurately as possible.'.
             'The human will ask you to do things, and you should do them.',
+            maxIterations: 20,
             hooks: $hooks,
         );
 

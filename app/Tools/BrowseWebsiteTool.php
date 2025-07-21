@@ -23,7 +23,6 @@ class BrowseWebsiteTool extends Tool
         $html = $response->body();
 
         $text = Html2Text::convert($html);
-        //        $text = TextUtils::cleanHtml($html);
 
         return "Website contents: \n\n{$text}";
     }
