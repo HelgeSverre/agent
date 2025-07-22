@@ -2,7 +2,8 @@
 
 namespace App\Tools\EmailToolkit;
 
-use App\Agent\Tool\Description;
+use App\Agent\Tool\Attributes\AsTool;
+use App\Agent\Tool\Attributes\Description;
 use App\Agent\Tool\Tool;
 use App\TextUtils;
 use Carbon\Carbon;
@@ -10,12 +11,12 @@ use Illuminate\Support\Str;
 use Webklex\PHPIMAP\Client;
 use Webklex\PHPIMAP\Message;
 
+#[AsTool(
+    name: 'Search Email',
+    description: 'Search for emails by keyword and date range'
+)]
 class SearchEmailTool extends Tool
 {
-    protected string $name = 'Search Email';
-
-    protected string $description = 'Search for emails by keyword and date range';
-
     protected Client $client;
 
     public function __construct(?Client $client = null)

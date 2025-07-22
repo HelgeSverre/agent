@@ -2,7 +2,8 @@
 
 namespace App\Tools\EmailToolkit;
 
-use App\Agent\Tool\Description;
+use App\Agent\Tool\Attributes\AsTool;
+use App\Agent\Tool\Attributes\Description;
 use App\Agent\Tool\Tool;
 use App\TextUtils;
 use Carbon\Carbon;
@@ -11,12 +12,12 @@ use Illuminate\Support\Str;
 use Webklex\PHPIMAP\Client;
 use Webklex\PHPIMAP\Message;
 
+#[AsTool(
+    name: 'Summarize conversation history',
+    description: 'Summarize the conversation history from an individual by their email address'
+)]
 class SummarizeConversationHistoryTool extends Tool
 {
-    protected string $name = 'Summarize conversation history';
-
-    protected string $description = 'Summarize the conversation history from an individual by their email address';
-
     protected Client $client;
 
     public function __construct(?Client $client = null)

@@ -2,16 +2,17 @@
 
 namespace App\Tools;
 
+use App\Agent\Tool\Attributes\AsTool;
 use App\Agent\Tool\Tool;
 use Crwlr\Html2Text\Html2Text;
 use Illuminate\Support\Facades\Http;
 
+#[AsTool(
+    name: 'browse_website',
+    description: 'Get the contents of a website'
+)]
 class BrowseWebsiteTool extends Tool
 {
-    protected string $name = 'browse_website';
-
-    protected string $description = 'Get the contents of a website';
-
     public function run(string $url): string
     {
         $response = Http::get($url);

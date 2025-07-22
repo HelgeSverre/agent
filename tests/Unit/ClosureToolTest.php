@@ -1,6 +1,6 @@
 <?php
 
-use App\Agent\Tool\Description;
+use App\Agent\Tool\Attributes\Description;
 use App\Agent\Tool\Tool;
 use App\Agent\Tool\ToolArgument;
 

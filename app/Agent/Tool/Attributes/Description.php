@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Agent\Tool;
+namespace App\Agent\Tool\Attributes;
 
 use Attribute;
 

@@ -2,14 +2,15 @@
 
 namespace App\Tools;
 
+use App\Agent\Tool\Attributes\AsTool;
 use App\Agent\Tool\Tool;
 
+#[AsTool(
+    name: 'read_file',
+    description: 'read a file from the local file system'
+)]
 class ReadFileTool extends Tool
 {
-    protected string $name = 'read_file';
-
-    protected string $description = 'read a file from the local file system';
-
     protected string $baseDir;
 
     public function __construct($baseDir = null)

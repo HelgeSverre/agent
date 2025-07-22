@@ -2,19 +2,20 @@
 
 namespace App\Tools\EmailToolkit;
 
-use App\Agent\Tool\Description;
+use App\Agent\Tool\Attributes\AsTool;
+use App\Agent\Tool\Attributes\Description;
 use App\Agent\Tool\Tool;
 use Illuminate\Support\Str;
 use Stevebauman\Hypertext\Transformer;
 use Webklex\PHPIMAP\Client;
 use Webklex\PHPIMAP\Message;
 
+#[AsTool(
+    name: 'Create Draft Email',
+    description: 'Create a draft email'
+)]
 class CreateDraftEmailTool extends Tool
 {
-    protected string $name = 'Create Draft Email';
-
-    protected string $description = 'Create a draft email';
-
     protected Client $client;
 
     public function __construct(?Client $client = null)

@@ -1,7 +1,7 @@
 <?php
 
 use App\Agent\Agent;
-use App\Agent\Tool\Description;
+use App\Agent\Tool\Attributes\Description;
 use App\Agent\Tool\Tool;
 
 class TestTool extends Tool

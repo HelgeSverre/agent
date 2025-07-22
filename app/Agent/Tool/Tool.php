@@ -2,6 +2,7 @@
 
 namespace App\Agent\Tool;
 
+use App\Agent\Tool\Attributes\AsTool;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Closure;
@@ -61,20 +62,38 @@ abstract class Tool
 
     public function name(): string
     {
+        // Check for AsTool attribute first
+        $reflection = new ReflectionClass($this);
+        $attributes = $reflection->getAttributes(AsTool::class);
+
+        if (! empty($attributes)) {
+            return $attributes[0]->newInstance()->name;
+        }
+
+        // Fall back to property-based approach
         if (property_exists($this, 'name')) {
             return $this->name;
         }
 
-        throw new Exception('Tool must implement a name method');
+        throw new Exception('Tool must implement a name method or use #[AsTool] attribute');
     }
 
     public function description(): string
     {
+        // Check for AsTool attribute first
+        $reflection = new ReflectionClass($this);
+        $attributes = $reflection->getAttributes(AsTool::class);
+
+        if (! empty($attributes)) {
+            return $attributes[0]->newInstance()->description;
+        }
+
+        // Fall back to property-based approach
         if (property_exists($this, 'description')) {
             return $this->description;
         }
 
-        throw new Exception('Tool must implement a description method');
+        throw new Exception('Tool must implement a description method or use #[AsTool] attribute');
     }
 
     /**

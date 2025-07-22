@@ -2,21 +2,16 @@
 
 namespace App\Tools;
 
+use App\Agent\Tool\Attributes\AsTool;
 use App\Agent\Tool\Tool;
 use Illuminate\Support\Facades\Http;
 
+#[AsTool(
+    name: 'search_web',
+    description: 'search the web for a specific search term'
+)]
 class SearchWebTool extends Tool
 {
-    public function name(): string
-    {
-        return 'search_web';
-    }
-
-    public function description(): string
-    {
-        return 'search the web for a specific search term';
-    }
-
     public function run(string $searchTerm, int $numResults = 5): string
     {
         /** @noinspection LaravelFunctionsInspection */

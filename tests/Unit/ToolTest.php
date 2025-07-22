@@ -1,7 +1,7 @@
 <?php
 
 uses(\App\Agent\Tool\Tool::class);
-use App\Agent\Tool\Description;
+use App\Agent\Tool\Attributes\Description;
 use App\Agent\Tool\Tool;
 use App\Agent\Tool\ToolArgument;
 use Illuminate\Support\Carbon;

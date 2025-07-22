@@ -2,17 +2,18 @@
 
 namespace App\Tools;
 
-use App\Agent\Tool\Description;
+use App\Agent\Tool\Attributes\AsTool;
+use App\Agent\Tool\Attributes\Description;
 use App\Agent\Tool\Tool;
 use Illuminate\Support\Str;
 use RuntimeException;
 
+#[AsTool(
+    name: 'speak',
+    description: 'Speak a message using the text-to-speech service'
+)]
 class SpeakTool extends Tool
 {
-    protected string $name = 'speak';
-
-    protected string $description = 'Speak a message using the text-to-speech service';
-
     public function run(
         #[Description('The message to speak')]
         string $message

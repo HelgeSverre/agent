@@ -2,7 +2,7 @@
 
 namespace App\Tools;
 
-use App\Agent\Tool\Description;
+use App\Agent\Tool\Attributes\Description;
 use App\Agent\Tool\Tool;
 
 class WriteFileTool extends Tool
