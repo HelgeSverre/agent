@@ -3,6 +3,7 @@
 namespace App\Agent;
 
 use OpenAI\Laravel\Facades\OpenAI;
+use Throwable;
 
 class FunctionCallBuilder
 {
@@ -65,7 +66,7 @@ class FunctionCallBuilder
             }
 
             return [];
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Log the error for debugging
             error_log('FunctionCallBuilder error: '.$e->getMessage());
             error_log('Stack trace: '.$e->getTraceAsString());
