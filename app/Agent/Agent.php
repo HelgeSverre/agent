@@ -11,6 +11,8 @@ class Agent
 
     protected array $intermediateSteps = [];
 
+    protected int $maxIntermediateSteps = 10;
+
     protected int $currentIteration = 0;
 
     protected array $toolsSchema = [];
@@ -81,17 +83,18 @@ class Agent
             $nextStep = $this->decideNextStep($task);
             $this->hooks?->trigger('next_step', $nextStep);
 
-            if ($nextStep['thought'] ?? false) {
-                $this->hooks?->trigger('thought', $nextStep['thought'] ?? '');
-                $this->recordStep('thought', $nextStep['thought'] ?? '');
-            }
-
             if (isset($nextStep['function_call'])) {
                 $toolName = $nextStep['function_call']['name'];
                 $toolInput = $nextStep['function_call']['arguments'] ?? [];
 
                 $this->hooks?->trigger('action', ['action' => $toolName, 'action_input' => $toolInput]);
                 $this->recordStep('action', ['action' => $toolName, 'action_input' => $toolInput]);
+
+                // TODO: might be better to call it "reasoning" when its related to "why this next step", instead of allowing "think about it" as a separate action to take.
+                if ($toolInput['thought'] ?? false) {
+                    $this->hooks?->trigger('thought', $toolInput['thought'] ?? '');
+                    $this->recordStep('thought', $toolInput['thought'] ?? '');
+                }
 
                 if ($toolName === 'final_answer') {
                     $this->isTaskCompleted = true;
@@ -152,8 +155,8 @@ class Agent
 
     protected function trimIntermediateSteps(): void
     {
-        if (count($this->intermediateSteps) > 5) {
-            $this->intermediateSteps = array_slice($this->intermediateSteps, -5);
+        if (count($this->intermediateSteps) > $this->maxIntermediateSteps) {
+            $this->intermediateSteps = array_slice($this->intermediateSteps, -$this->maxIntermediateSteps);
         }
     }
 
@@ -186,7 +189,7 @@ class Agent
                             'description' => 'Your thinking process behind this answer',
                         ],
                     ],
-                    'required' => ['answer'],
+                    'required' => ['answer', 'thought'],
                 ],
             ],
         ])

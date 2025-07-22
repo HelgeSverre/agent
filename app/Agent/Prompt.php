@@ -2,8 +2,13 @@
 
 namespace App\Agent;
 
+use App\Agent\Tool\Tool;
+
 class Prompt
 {
+    /**
+     * @param  Tool[]|null  $tools
+     */
     public function __construct(
         protected string $task,
         protected ?string $goal,
@@ -84,11 +89,14 @@ class Prompt
         foreach ($this->tools as $tool) {
             $toolInstructions .= "### {$tool->name()}\n";
             $toolInstructions .= "{$tool->description()}\n\n";
-            $toolInstructions .= "Parameters:\n";
 
-            foreach ($tool->arguments() as $arg) {
-                $type = $arg->nullable ? "({$arg->type}, optional)" : "({$arg->type}, required)";
-                $toolInstructions .= sprintf("- %s %s: %s\n", $arg->name, $type, $arg->description ?? '');
+            if ($tool->arguments()) {
+                $toolInstructions .= "Parameters:\n";
+
+                foreach ($tool->arguments() as $arg) {
+                    $type = $arg->nullable ? "({$arg->type}, optional)" : "({$arg->type}, required)";
+                    $toolInstructions .= sprintf("- %s %s: %s\n", $arg->name, $type, $arg->description ?? '');
+                }
             }
 
             $toolInstructions .= "\n";

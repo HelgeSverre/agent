@@ -68,7 +68,7 @@ class RunAgent extends Command
         });
 
         $hooks->on('thought', function ($thought) {
-            $this->line('<fg=blue>◈</> <fg=gray>'.Str::limit($thought, 100).'</>');
+            $this->line('<fg=blue>◈</> <fg=gray>'.Str::limit($thought, 1000).'</>');
         });
 
         $hooks->on('observation', function ($observation) {
