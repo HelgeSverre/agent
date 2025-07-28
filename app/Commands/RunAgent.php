@@ -18,7 +18,8 @@ class RunAgent extends Command
     protected $signature = 'run {task?} 
         {--speak : Speak the final answer using the system\'s text-to-speech}
         {--save-session= : Save session with ID}
-        {--resume= : Resume session by ID}';
+        {--resume= : Resume session by ID}
+        {--parallel : Enable parallel tool execution}';
 
     public function handle(): void
     {
@@ -52,6 +53,11 @@ class RunAgent extends Command
             
             if (!$task) {
                 $task = $this->ask('What do you want to do?');
+            }
+            
+            // Show parallel mode status
+            if ($this->option('parallel')) {
+                $this->info('Parallel tool execution: ENABLED');
             }
         }
 
@@ -98,7 +104,17 @@ class RunAgent extends Command
         });
 
         $hooks->on('observation', function ($observation) {
-            if (strlen($observation) > 200) {
+            // Special handling for parallel execution results
+            if (str_contains($observation, '[Parallel Execution Complete]')) {
+                $lines = explode("\n", $observation);
+                foreach ($lines as $line) {
+                    if (empty(trim($line))) continue;
+                    $this->line('  <fg=gray>└─ ' . Str::limit($line, 100) . '</>');
+                }
+            } elseif (str_contains($observation, '[Parallel Queue]')) {
+                // Show queue messages
+                $this->line('  <fg=cyan>└─ ' . $observation . '</>');
+            } elseif (strlen($observation) > 200) {
                 $this->line('  <fg=gray>└─ '.Str::limit($observation, 80).'...</>');
             }
         });
@@ -124,6 +140,14 @@ class RunAgent extends Command
             $this->line('<fg=green>✓</> <fg=white;options=bold>Answer:</> '.wordwrap($finalAnswer, $wrap));
             $this->newLine();
         });
+        
+        $hooks->on('parallel_execution_start', function ($count) {
+            $this->line('<fg=magenta>⟐</> <fg=white;options=bold>Executing '.$count.' tools in parallel...</>');
+        });
+        
+        $hooks->on('parallel_execution_complete', function ($count) {
+            $this->line('<fg=magenta>⟐</> <fg=green>Parallel execution complete ('.$count.' results)</>');
+        });
 
         // Create agent if not resuming
         if (!$agent) {
@@ -134,6 +158,7 @@ class RunAgent extends Command
                 'The human will ask you to do things, and you should do them.',
                 maxIterations: 20,
                 hooks: $hooks,
+                parallelEnabled: $this->option('parallel'),
             );
             
             // Enable session if requested

@@ -73,5 +73,20 @@ return [
         OpenAI\Laravel\ServiceProvider::class,
         LaravelServiceProvider::class,
     ],
+    
+    /*
+    |--------------------------------------------------------------------------
+    | Parallel Execution Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configure parallel tool execution behavior
+    |
+    */
+    
+    'parallel_execution' => [
+        'enabled' => env('AGENT_PARALLEL_ENABLED', false),  // Opt-in by default
+        'max_processes' => env('AGENT_MAX_PARALLEL', 4),
+        'timeout' => env('AGENT_TOOL_TIMEOUT', 30),
+    ],
 
 ];

@@ -2,6 +2,7 @@
 
 namespace App\Agent;
 
+use App\Agent\Execution\ParallelExecutor;
 use App\Agent\Session\AgentState;
 use App\Agent\Session\SessionManager;
 use App\Agent\Tool\Tool;
@@ -24,6 +25,12 @@ class Agent
     protected ?SessionManager $sessionManager = null;
     
     protected ?string $task = null;
+    
+    protected ?ParallelExecutor $parallelExecutor = null;
+    
+    protected array $pendingParallelTools = [];
+    
+    protected array $recentlyExecutedTools = [];
 
     /**
      * @param  array|Tool[]  $tools
@@ -33,8 +40,17 @@ class Agent
         protected ?string $goal = null,
         protected int $maxIterations = 10,
         protected ?Hooks $hooks = null,
+        protected bool $parallelEnabled = false,
     ) {
         $this->prepareToolsSchema();
+        
+        // Only initialize parallel executor if enabled
+        if ($this->parallelEnabled || config('app.parallel_execution.enabled', false)) {
+            $this->parallelExecutor = new ParallelExecutor(
+                config('app.parallel_execution.max_processes', 4),
+                config('app.parallel_execution.timeout', 30)
+            );
+        }
     }
     
     public function enableSession(string $sessionId): void
@@ -58,7 +74,8 @@ class Agent
             tools: $tools,
             goal: $state->goal,
             maxIterations: 10,
-            hooks: $hooks
+            hooks: $hooks,
+            parallelEnabled: config('app.parallel_execution.enabled', false)
         );
         
         // Restore state
@@ -155,9 +172,38 @@ class Agent
                     }
                 }
 
-                $observation = $this->executeTool($toolName, $toolInput);
-                $this->hooks?->trigger('observation', $observation);
-                $this->recordStep('observation', $observation);
+                // Check if this tool was recently executed in a parallel batch
+                if ($this->wasRecentlyExecuted($toolName, $toolInput)) {
+                    $skipMsg = "[Skipped] Tool '{$toolName}' was already executed in parallel batch";
+                    $this->hooks?->trigger('observation', $skipMsg);
+                    $this->recordStep('observation', $skipMsg);
+                    continue;
+                }
+                
+                // Check if we should queue this for parallel execution
+                if ($this->parallelExecutor && $this->shouldQueueForParallel($nextStep)) {
+                    $this->queueToolForParallel($toolName, $toolInput);
+                    
+                    // Provide feedback that tool is queued
+                    $queuedMsg = "[Parallel Queue] Tool '{$toolName}' queued (Queue size: " . count($this->pendingParallelTools) . ")";
+                    $this->hooks?->trigger('observation', $queuedMsg);
+                    $this->recordStep('observation', $queuedMsg);
+                    
+                    // Simplified: Execute immediately when we have 2+ tools
+                    if (count($this->pendingParallelTools) >= 2) {
+                        $observations = $this->executeParallelTools();
+                        
+                        // Record all parallel results as a single comprehensive observation
+                        $parallelSummary = "[Parallel Execution Complete]\n" . implode("\n\n", $observations);
+                        $this->hooks?->trigger('observation', $parallelSummary);
+                        $this->recordStep('observation', $parallelSummary);
+                    }
+                } else {
+                    // Execute single tool normally
+                    $observation = $this->executeTool($toolName, $toolInput);
+                    $this->hooks?->trigger('observation', $observation);
+                    $this->recordStep('observation', $observation);
+                }
             }
         }
     }
@@ -178,6 +224,122 @@ class Agent
         } catch (Exception $e) {
             return "Error executing tool: {$e->getMessage()}";
         }
+    }
+    
+    protected function shouldQueueForParallel(array $nextStep): bool
+    {
+        // Skip if parallel execution is disabled
+        if (!$this->parallelExecutor) {
+            return false;
+        }
+        
+        // If we already have tools queued, continue queuing
+        if (!empty($this->pendingParallelTools)) {
+            return true;
+        }
+        
+        // Check the original task for parallel indicators
+        if ($this->task && preg_match('/simultaneously|at the same time|both.*and.*and|in parallel/i', $this->task)) {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    
+    protected function queueToolForParallel(string $toolName, array $toolInput): void
+    {
+        $this->pendingParallelTools[] = [
+            'id' => uniqid('tool_'),
+            'tool' => $toolName,
+            'arguments' => $toolInput
+        ];
+    }
+    
+    
+    protected function executeParallelTools(): array
+    {
+        if (empty($this->pendingParallelTools)) {
+            return [];
+        }
+        
+        $this->hooks?->trigger('parallel_execution_start', count($this->pendingParallelTools));
+        
+        // Execute tools in parallel
+        $results = $this->parallelExecutor->executeParallel($this->pendingParallelTools);
+        
+        // Track executed tools using simplified key
+        $now = time();
+        foreach ($this->pendingParallelTools as $tool) {
+            $key = $this->getToolExecutionKey($tool['tool'], $tool['arguments']);
+            $this->recentlyExecutedTools[$key] = ['time' => $now];
+        }
+        
+        // Clear the queue
+        $toolsExecuted = $this->pendingParallelTools;
+        $this->pendingParallelTools = [];
+        
+        // Process results
+        $observations = [];
+        $toolSummaries = [];
+        
+        foreach ($toolsExecuted as $tool) {
+            $result = $results[$tool['id']] ?? null;
+            
+            // Create summary of what was executed
+            $argsSummary = '';
+            if (isset($tool['arguments']['searchTerm'])) {
+                $argsSummary = " (query: '{$tool['arguments']['searchTerm']}')";
+            } elseif (isset($tool['arguments']['file_path'])) {
+                $argsSummary = " (file: '{$tool['arguments']['file_path']}')";
+            }
+            
+            $toolSummaries[] = "- {$tool['tool']}{$argsSummary}";
+            
+            if ($result && $result['success']) {
+                $observations[] = "Tool '{$tool['tool']}' result: " . $result['result'];
+            } else {
+                $error = $result['error'] ?? 'Unknown error';
+                $observations[] = "Tool '{$tool['tool']}' failed: " . $error;
+            }
+        }
+        
+        // Add summary header
+        array_unshift($observations, "Executed " . count($toolsExecuted) . " tools in parallel:\n" . implode("\n", $toolSummaries) . "\n\nResults:");
+        
+        $this->hooks?->trigger('parallel_execution_complete', count($observations));
+        
+        return $observations;
+    }
+    
+    protected function wasRecentlyExecuted(string $toolName, array $toolInput): bool
+    {
+        // Simplified: Create a unique key for tool+args
+        $key = $this->getToolExecutionKey($toolName, $toolInput);
+        
+        // Clean up old entries (older than 30 seconds)
+        $now = time();
+        $this->recentlyExecutedTools = array_filter(
+            $this->recentlyExecutedTools,
+            fn($tool) => ($now - $tool['time']) < 30
+        );
+        
+        // Check if this tool was recently executed
+        return isset($this->recentlyExecutedTools[$key]);
+    }
+    
+    protected function getToolExecutionKey(string $toolName, array $toolInput): string
+    {
+        // Create simple key based on tool name and main argument
+        $mainArg = match($toolName) {
+            'search_web' => $toolInput['searchTerm'] ?? '',
+            'read_file', 'write_file' => $toolInput['file_path'] ?? $toolInput['filename'] ?? '',
+            'browse_website' => $toolInput['url'] ?? '',
+            'run_command' => $toolInput['command'] ?? '',
+            default => json_encode($toolInput)
+        };
+        
+        return $toolName . ':' . $mainArg;
     }
 
     protected function evaluateTaskCompletion(string $task)

@@ -41,8 +41,10 @@ class Prompt
             $this->prepareContext(),
             '## YOUR NEXT STEPS',
             '1. Think step-by-step about what you need to do to solve this task',
-            '2. Choose the appropriate tool to use, or provide a final answer if the task is complete',
-            '3. If using a tool, be explicit and exact with the inputs required',
+            '2. Consider if multiple independent operations could be done simultaneously (e.g., searching multiple sources, reading multiple files)',
+            '3. Choose the appropriate tool to use, or provide a final answer if the task is complete',
+            '4. If using a tool, be explicit and exact with the inputs required',
+            '5. When multiple tools are needed, mention if they can be executed "simultaneously" or "in parallel"',
         ]);
     }
 
