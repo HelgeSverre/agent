@@ -2,6 +2,7 @@
 
 namespace App\Agent;
 
+use App\Agent\Context\ContextManager;
 use App\Agent\Execution\ParallelExecutor;
 use App\Agent\Session\AgentState;
 use App\Agent\Session\SessionManager;
@@ -35,6 +36,10 @@ class Agent
     protected int $parallelExecutionCount = 0;
     
     protected ?array $executionPlan = null;
+    
+    protected ?ContextManager $contextManager = null;
+    
+    protected array $consecutiveFailures = [];
 
     /**
      * @param  array|Tool[]  $tools
@@ -47,6 +52,9 @@ class Agent
         protected bool $parallelEnabled = false,
     ) {
         $this->prepareToolsSchema();
+        
+        // Initialize context manager
+        $this->contextManager = new ContextManager();
         
         // Only initialize parallel executor if enabled
         if ($this->parallelEnabled || config('app.parallel_execution.enabled', false)) {
@@ -66,6 +74,27 @@ class Agent
     public function setExecutionPlan(array $plan): void
     {
         $this->executionPlan = $plan;
+    }
+    
+    public function resetForNextTask(): void
+    {
+        // Reset task completion state
+        $this->isTaskCompleted = false;
+        $this->currentIteration = 0;
+        
+        // Clear execution plan as it's task-specific
+        $this->executionPlan = null;
+        
+        // Clear recently executed tools to prevent cross-task interference
+        $this->recentlyExecutedTools = [];
+        $this->pendingParallelTools = [];
+        $this->parallelExecutionCount = 0;
+        
+        // Clear consecutive failures for fresh start
+        $this->consecutiveFailures = [];
+        
+        // Keep intermediate steps for context continuity
+        // The trimIntermediateSteps will manage the window size
     }
     
     public static function fromSession(string $sessionId, array $tools = [], ?Hooks $hooks = null): ?self
@@ -232,11 +261,35 @@ class Agent
             return "Tool not found: {$toolName}";
         }
 
+        // Check for consecutive failures
+        $failureKey = $this->getToolExecutionKey($toolName, $toolInput);
+        $failureCount = $this->consecutiveFailures[$failureKey] ?? 0;
+        
+        if ($failureCount >= 3) {
+            return "Error: Tool '{$toolName}' has failed 3 times with similar parameters. Please try a different approach or provide valid parameters.";
+        }
+
         $this->hooks?->trigger('tool_execution', $toolName, $toolInput);
 
         try {
-            return $tool->execute($toolInput);
+            $result = $tool->execute($toolInput);
+            
+            // Check if the result indicates an error
+            if (str_starts_with($result, 'Error:')) {
+                $this->consecutiveFailures[$failureKey] = $failureCount + 1;
+                
+                // Add helpful context for the agent
+                if ($failureCount >= 1) {
+                    $result .= " (Attempt " . ($failureCount + 1) . " of 3 before giving up)";
+                }
+            } else {
+                // Clear failure count on success
+                unset($this->consecutiveFailures[$failureKey]);
+            }
+            
+            return $result;
         } catch (Exception $e) {
+            $this->consecutiveFailures[$failureKey] = $failureCount + 1;
             return "Error executing tool: {$e->getMessage()}";
         }
     }
@@ -402,8 +455,33 @@ class Agent
 
     protected function trimIntermediateSteps(): void
     {
-        if (count($this->intermediateSteps) > $this->maxIntermediateSteps) {
-            $this->intermediateSteps = array_slice($this->intermediateSteps, -$this->maxIntermediateSteps);
+        // Use ContextManager for intelligent context management
+        if ($this->contextManager) {
+            // First, compress old contexts if needed
+            $this->intermediateSteps = $this->contextManager->compressOldContext($this->intermediateSteps);
+            
+            // Store original steps before trimming
+            $originalSteps = $this->intermediateSteps;
+            $originalCount = count($originalSteps);
+            
+            // Manage context with intelligent trimming
+            $this->intermediateSteps = $this->contextManager->manageContext($this->intermediateSteps);
+            
+            // If context was trimmed, add a summary of what was dropped
+            if (count($this->intermediateSteps) < $originalCount) {
+                $summary = $this->contextManager->summarizeDroppedContext(
+                    $originalSteps,
+                    $this->intermediateSteps
+                );
+                if ($summary) {
+                    array_unshift($this->intermediateSteps, $summary);
+                }
+            }
+        } else {
+            // Fallback to simple trimming
+            if (count($this->intermediateSteps) > $this->maxIntermediateSteps) {
+                $this->intermediateSteps = array_slice($this->intermediateSteps, -$this->maxIntermediateSteps);
+            }
         }
     }
 
@@ -454,6 +532,11 @@ class Agent
     protected function recordStep(string $type, mixed $content)
     {
         $this->intermediateSteps[] = ['type' => $type, 'content' => $content];
+        
+        // Trigger hook for compressed context
+        if ($type === 'compressed_context') {
+            $this->hooks?->trigger('compressed_context', $content);
+        }
         
         // Auto-save if session enabled
         if ($this->sessionId && $this->sessionManager) {

@@ -139,6 +139,16 @@ abstract class Tool
 
         $args = $this->arguments();
 
+        // Validate required parameters first
+        foreach ($args as $arg) {
+            $value = $arguments[$arg->name] ?? null;
+            
+            // Check if required parameter is missing
+            if (!$arg->nullable && ($value === null || $value === '')) {
+                return "Error: Required parameter '{$arg->name}' is missing or empty for tool '{$this->name()}'";
+            }
+        }
+
         foreach ($args as $arg) {
 
             $value = $arguments[$arg->name] ?? null;
@@ -159,6 +169,10 @@ abstract class Tool
         // TODO: remove extra arguments that are not defined in the tool
         $validArgs = Arr::only($arguments, collect($args)->map(fn ($arg) => $arg->name)->toArray());
 
-        return call_user_func_array([$this, 'run'], $validArgs);
+        try {
+            return call_user_func_array([$this, 'run'], $validArgs);
+        } catch (Exception $e) {
+            return "Error executing tool '{$this->name()}': " . $e->getMessage();
+        }
     }
 }

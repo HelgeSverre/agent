@@ -4,6 +4,7 @@ namespace App\Commands;
 
 use App\Agent\Agent;
 use App\Agent\Hooks;
+use App\Agent\LLM;
 use App\Agent\Planning\Planner;
 use App\Tools\BrowseWebsiteTool;
 use App\Tools\ReadFileTool;
@@ -21,7 +22,8 @@ class RunAgent extends Command
         {--save-session= : Save session with ID}
         {--resume= : Resume session by ID}
         {--parallel : Enable parallel tool execution}
-        {--plan : Create and show execution plan before running}';
+        {--plan : Create and show execution plan before running}
+        {--chat : Enable conversational mode for continuous interaction}';
 
     public function handle(): void
     {
@@ -113,12 +115,82 @@ class RunAgent extends Command
             }
         }
 
-        $finalResponse = $agent->run($task);
+        // Check if chat mode is enabled
+        if ($this->option('chat')) {
+            $this->runChatMode($agent, $task);
+        } else {
+            $finalResponse = $agent->run($task);
 
-        // For fun.
-        if ($this->option('speak')) {
-            shell_exec('say '.escapeshellarg(Str::of($finalResponse)->replace("\n", ' ')->trim()));
+            // For fun.
+            if ($this->option('speak')) {
+                shell_exec('say '.escapeshellarg(Str::of($finalResponse)->replace("\n", ' ')->trim()));
+            }
         }
+    }
+    
+    protected function runChatMode(Agent $agent, string $initialTask): void
+    {
+        $this->info('◈ Chat mode enabled. Type "exit" or "quit" to end the conversation.');
+        $this->newLine();
+        
+        $task = $initialTask;
+        $conversationActive = true;
+        
+        while ($conversationActive) {
+            // Run the agent with current task
+            $finalResponse = $agent->run($task);
+            
+            // Speak if enabled
+            if ($this->option('speak')) {
+                shell_exec('say '.escapeshellarg(Str::of($finalResponse)->replace("\n", ' ')->trim()));
+            }
+            
+            // Visual separator
+            $this->newLine();
+            $this->line('<fg=gray>' . str_repeat('─', 80) . '</>');
+            $this->newLine();
+            
+            // Get next input
+            $nextInput = $this->ask('>');
+            
+            if (in_array(strtolower($nextInput), ['exit', 'quit', 'bye', 'q'])) {
+                $this->info('◉ Ending chat session. Goodbye!');
+                $conversationActive = false;
+            } else {
+                // Enhance task with context if it seems like a follow-up
+                $task = $this->enhanceTaskWithContext($nextInput, $finalResponse);
+                
+                // Reset agent for next task but maintain context
+                $agent->resetForNextTask();
+            }
+        }
+    }
+    
+    protected function enhanceTaskWithContext(string $input, string $previousResponse): string
+    {
+        // Use LLM to classify if this is a follow-up
+        $prompt = "Given the previous conversation and new input, determine if the new input is a follow-up question or a completely new task.
+
+Previous response summary: " . Str::limit($previousResponse, 200) . "
+New input: {$input}
+
+Analyze this and return a JSON response with this structure:
+{
+    \"is_follow_up\": true/false,
+    \"context_needed\": \"Brief context if follow-up, or empty string\",
+    \"enhanced_input\": \"The original input with added context if needed\"
+}
+
+Be concise. If it's a follow-up, add minimal context in parentheses.";
+
+        $result = LLM::json($prompt);
+        
+        if ($result && isset($result['enhanced_input'])) {
+            return $result['enhanced_input'];
+        }
+        
+        // Fallback if LLM fails
+        return $input;
     }
     
     protected function registerHooks(Hooks $hooks, int $wrap): void
@@ -216,6 +288,10 @@ class RunAgent extends Command
                     $this->line('   <fg=gray>↳ ' . $observation . '</>');
                 }
             }
+        });
+        
+        $hooks->on('compressed_context', function ($context) {
+            $this->line('<fg=yellow>◊</> <fg=gray>' . $context . '</>');
         });
 
         $hooks->on('evaluation', function ($eval) {
