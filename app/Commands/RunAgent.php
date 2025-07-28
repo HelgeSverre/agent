@@ -107,15 +107,42 @@ class RunAgent extends Command
             // Special handling for parallel execution results
             if (str_contains($observation, '[Parallel Execution Complete]')) {
                 $lines = explode("\n", $observation);
+                $inResults = false;
                 foreach ($lines as $line) {
                     if (empty(trim($line))) continue;
-                    $this->line('  <fg=gray>└─ ' . Str::limit($line, 100) . '</>');
+                    
+                    if (str_contains($line, '[Parallel Execution Complete]')) {
+                        $this->line('  <fg=magenta>◉</> <fg=white;options=bold>' . trim($line) . '</>');
+                    } elseif (str_contains($line, 'Executed') && str_contains($line, 'tools:')) {
+                        $this->line('  <fg=gray>' . $line . '</>');
+                    } elseif (str_starts_with(trim($line), '-')) {
+                        $this->line('    <fg=cyan>' . $line . '</>');
+                    } elseif (str_contains($line, 'Results:')) {
+                        $this->line('  <fg=gray>' . $line . '</>');
+                        $inResults = true;
+                    } elseif ($inResults && str_contains($line, '[✓')) {
+                        // Successful result
+                        $this->line('    <fg=green>' . Str::limit($line, 120) . '</>');
+                    } elseif ($inResults && str_contains($line, '[✗')) {
+                        // Failed result
+                        $this->line('    <fg=red>' . Str::limit($line, 120) . '</>');
+                    } elseif ($inResults) {
+                        // Result content
+                        $this->line('    <fg=gray>' . Str::limit($line, 100) . '</>');
+                    } else {
+                        $this->line('  <fg=gray>' . $line . '</>');
+                    }
                 }
             } elseif (str_contains($observation, '[Parallel Queue]')) {
                 // Show queue messages
-                $this->line('  <fg=cyan>└─ ' . $observation . '</>');
+                $this->line('  <fg=cyan>⟐</> ' . str_replace('[Parallel Queue] ', '', $observation));
+            } elseif (str_contains($observation, '[Skipped]')) {
+                // Show skip messages
+                $this->line('  <fg=yellow>⟐</> ' . str_replace('[Skipped] ', '', $observation));
             } elseif (strlen($observation) > 200) {
                 $this->line('  <fg=gray>└─ '.Str::limit($observation, 80).'...</>');
+            } else {
+                $this->line('  <fg=gray>└─ ' . $observation . '</>');
             }
         });
 

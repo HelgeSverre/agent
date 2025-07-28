@@ -31,6 +31,8 @@ class Agent
     protected array $pendingParallelTools = [];
     
     protected array $recentlyExecutedTools = [];
+    
+    protected int $parallelExecutionCount = 0;
 
     /**
      * @param  array|Tool[]  $tools
@@ -174,7 +176,13 @@ class Agent
 
                 // Check if this tool was recently executed in a parallel batch
                 if ($this->wasRecentlyExecuted($toolName, $toolInput)) {
-                    $skipMsg = "[Skipped] Tool '{$toolName}' was already executed in parallel batch";
+                    $key = $this->getToolExecutionKey($toolName, $toolInput);
+                    $mainArg = $this->getToolMainArg($toolName, $toolInput);
+                    
+                    // Check if it failed previously
+                    $failedMsg = isset($this->recentlyExecutedTools[$key . ':failed']) ? " (previous attempt failed)" : "";
+                    
+                    $skipMsg = "[Skipped] {$toolName} ({$mainArg}) - already executed{$failedMsg}";
                     $this->hooks?->trigger('observation', $skipMsg);
                     $this->recordStep('observation', $skipMsg);
                     continue;
@@ -193,10 +201,9 @@ class Agent
                     if (count($this->pendingParallelTools) >= 2) {
                         $observations = $this->executeParallelTools();
                         
-                        // Record all parallel results as a single comprehensive observation
-                        $parallelSummary = "[Parallel Execution Complete]\n" . implode("\n\n", $observations);
-                        $this->hooks?->trigger('observation', $parallelSummary);
-                        $this->recordStep('observation', $parallelSummary);
+                        // Record all parallel results as a comprehensive observation
+                        $this->hooks?->trigger('observation', implode("\n", $observations));
+                        $this->recordStep('observation', implode("\n", $observations));
                     }
                 } else {
                     // Execute single tool normally
@@ -238,6 +245,20 @@ class Agent
             return true;
         }
         
+        // Check if we've already executed parallel tools recently
+        // This prevents re-entering parallel mode for the same task
+        $recentSteps = array_slice($this->intermediateSteps, -5);
+        foreach ($recentSteps as $step) {
+            if ($step['type'] === 'observation' && str_contains($step['content'], '[Parallel Execution Complete]')) {
+                return false; // Already did parallel execution
+            }
+        }
+        
+        // Limit parallel executions to prevent loops
+        if ($this->parallelExecutionCount >= 3) {
+            return false; // Already did enough parallel executions
+        }
+        
         // Check the original task for parallel indicators
         if ($this->task && preg_match('/simultaneously|at the same time|both.*and.*and|in parallel/i', $this->task)) {
             return true;
@@ -265,47 +286,56 @@ class Agent
         
         $this->hooks?->trigger('parallel_execution_start', count($this->pendingParallelTools));
         
+        // Store tools before execution
+        $toolsToExecute = $this->pendingParallelTools;
+        
+        // Increment execution count
+        $this->parallelExecutionCount++;
+        
         // Execute tools in parallel
-        $results = $this->parallelExecutor->executeParallel($this->pendingParallelTools);
+        $results = $this->parallelExecutor->executeParallel($toolsToExecute);
         
         // Track executed tools using simplified key
         $now = time();
-        foreach ($this->pendingParallelTools as $tool) {
+        foreach ($toolsToExecute as $tool) {
             $key = $this->getToolExecutionKey($tool['tool'], $tool['arguments']);
             $this->recentlyExecutedTools[$key] = ['time' => $now];
         }
         
         // Clear the queue
-        $toolsExecuted = $this->pendingParallelTools;
         $this->pendingParallelTools = [];
         
         // Process results
         $observations = [];
         $toolSummaries = [];
         
-        foreach ($toolsExecuted as $tool) {
+        foreach ($toolsToExecute as $tool) {
             $result = $results[$tool['id']] ?? null;
             
             // Create summary of what was executed
-            $argsSummary = '';
-            if (isset($tool['arguments']['searchTerm'])) {
-                $argsSummary = " (query: '{$tool['arguments']['searchTerm']}')";
-            } elseif (isset($tool['arguments']['file_path'])) {
-                $argsSummary = " (file: '{$tool['arguments']['file_path']}')";
-            }
-            
-            $toolSummaries[] = "- {$tool['tool']}{$argsSummary}";
+            $mainArg = $this->getToolMainArg($tool['tool'], $tool['arguments']);
+            $toolSummaries[] = "- {$tool['tool']} ({$mainArg})";
             
             if ($result && $result['success']) {
-                $observations[] = "Tool '{$tool['tool']}' result: " . $result['result'];
+                $observations[] = "[✓ {$tool['tool']}] " . $result['result'];
             } else {
                 $error = $result['error'] ?? 'Unknown error';
-                $observations[] = "Tool '{$tool['tool']}' failed: " . $error;
+                $observations[] = "[✗ {$tool['tool']}] Error: " . $error;
+                
+                // Track failed tools to provide better context
+                $failedKey = $this->getToolExecutionKey($tool['tool'], $tool['arguments']);
+                $this->recentlyExecutedTools[$failedKey . ':failed'] = ['time' => $now];
             }
         }
         
-        // Add summary header
-        array_unshift($observations, "Executed " . count($toolsExecuted) . " tools in parallel:\n" . implode("\n", $toolSummaries) . "\n\nResults:");
+        // Create comprehensive summary
+        $summary = "[Parallel Execution Complete]\n";
+        $summary .= "Executed " . count($toolsToExecute) . " tools:\n";
+        $summary .= implode("\n", $toolSummaries) . "\n\n";
+        $summary .= "Results:\n" . implode("\n---\n", $observations);
+        
+        // Return as single observation
+        $observations = [$summary];
         
         $this->hooks?->trigger('parallel_execution_complete', count($observations));
         
@@ -331,15 +361,19 @@ class Agent
     protected function getToolExecutionKey(string $toolName, array $toolInput): string
     {
         // Create simple key based on tool name and main argument
-        $mainArg = match($toolName) {
+        $mainArg = $this->getToolMainArg($toolName, $toolInput);
+        return $toolName . ':' . $mainArg;
+    }
+    
+    protected function getToolMainArg(string $toolName, array $toolInput): string
+    {
+        return match($toolName) {
             'search_web' => $toolInput['searchTerm'] ?? '',
             'read_file', 'write_file' => $toolInput['file_path'] ?? $toolInput['filename'] ?? '',
             'browse_website' => $toolInput['url'] ?? '',
             'run_command' => $toolInput['command'] ?? '',
             default => json_encode($toolInput)
         };
-        
-        return $toolName . ':' . $mainArg;
     }
 
     protected function evaluateTaskCompletion(string $task)
