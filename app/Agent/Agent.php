@@ -91,6 +91,7 @@ class Agent
         $agent->task = $state->task;
         $agent->intermediateSteps = $state->intermediateSteps;
         $agent->currentIteration = $state->currentIteration;
+        $agent->executionPlan = $state->executionPlan;
         $agent->enableSession($sessionId);
         
         return $agent;
@@ -461,7 +462,8 @@ class Agent
                 intermediateSteps: $this->intermediateSteps,
                 currentIteration: $this->currentIteration,
                 goal: $this->goal,
-                status: $this->isTaskCompleted ? 'completed' : 'running'
+                status: $this->isTaskCompleted ? 'completed' : 'running',
+                executionPlan: $this->executionPlan
             );
             
             $this->sessionManager->save($this->sessionId, $state->toArray());

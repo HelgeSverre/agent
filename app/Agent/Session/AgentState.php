@@ -12,6 +12,7 @@ class AgentState
         public int $currentIteration,
         public ?string $goal,
         public string $status = 'running',
+        public ?array $executionPlan = null,
         public ?string $createdAt = null
     ) {
         $this->createdAt ??= now()->toIso8601String();
@@ -25,6 +26,7 @@ class AgentState
             'current_iteration' => $this->currentIteration,
             'goal' => $this->goal,
             'status' => $this->status,
+            'execution_plan' => $this->executionPlan,
             'created_at' => $this->createdAt,
             'updated_at' => now()->toIso8601String(),
         ];
@@ -38,6 +40,7 @@ class AgentState
             currentIteration: $data['current_iteration'] ?? 0,
             goal: $data['goal'] ?? null,
             status: $data['status'] ?? 'running',
+            executionPlan: $data['execution_plan'] ?? null,
             createdAt: $data['created_at'] ?? now()->toIso8601String()
         );
     }
