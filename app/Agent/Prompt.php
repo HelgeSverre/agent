@@ -13,16 +13,18 @@ class Prompt
         protected string $task,
         protected ?string $goal,
         protected ?array $tools = [],
-        protected ?array $intermediateSteps = []
+        protected ?array $intermediateSteps = [],
+        protected ?array $executionPlan = null
     ) {}
 
     public static function make(
         string $task,
         ?string $goal,
         ?array $tools = [],
-        ?array $intermediateSteps = []
+        ?array $intermediateSteps = [],
+        ?array $executionPlan = null
     ): static {
-        return new self($task, $goal, $tools, $intermediateSteps);
+        return new self($task, $goal, $tools, $intermediateSteps, $executionPlan);
     }
 
     protected function combine(array $parts): string
@@ -36,6 +38,7 @@ class Prompt
             '# Agent Task Framework',
             $this->goal ? "## GOAL\n{$this->goal}" : '',
             "## TASK\n{$this->task}",
+            $this->prepareExecutionPlan(),
             $this->prepareTools(),
             $this->prepareSystemInstructions(),
             $this->prepareContext(),
@@ -80,6 +83,33 @@ class Prompt
         ]);
     }
 
+    protected function prepareExecutionPlan(): ?string
+    {
+        if (!$this->executionPlan) {
+            return null;
+        }
+        
+        $plan = "## EXECUTION PLAN\n";
+        $plan .= "The following plan has been created for this task:\n\n";
+        $plan .= "**Summary**: {$this->executionPlan['summary']}\n";
+        $plan .= "**Complexity**: {$this->executionPlan['complexity']}\n\n";
+        $plan .= "**Steps**:\n";
+        
+        foreach ($this->executionPlan['steps'] as $step) {
+            $plan .= "{$step['step_number']}. {$step['description']}\n";
+            if (!empty($step['tools'])) {
+                $plan .= "   - Tools: " . implode(', ', $step['tools']) . "\n";
+            }
+            if ($step['can_parallelize']) {
+                $plan .= "   - Can run in parallel with other steps\n";
+            }
+        }
+        
+        $plan .= "\nUse this plan as guidance, but adapt as needed based on actual results.";
+        
+        return $plan;
+    }
+    
     protected function prepareTools(): ?string
     {
         if (count($this->tools) == 0) {

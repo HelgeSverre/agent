@@ -4,6 +4,7 @@ namespace App\Commands;
 
 use App\Agent\Agent;
 use App\Agent\Hooks;
+use App\Agent\Planning\Planner;
 use App\Tools\BrowseWebsiteTool;
 use App\Tools\ReadFileTool;
 use App\Tools\RunCommandTool;
@@ -19,7 +20,8 @@ class RunAgent extends Command
         {--speak : Speak the final answer using the system\'s text-to-speech}
         {--save-session= : Save session with ID}
         {--resume= : Resume session by ID}
-        {--parallel : Enable parallel tool execution}';
+        {--parallel : Enable parallel tool execution}
+        {--plan : Create and show execution plan before running}';
 
     public function handle(): void
     {
@@ -60,7 +62,67 @@ class RunAgent extends Command
                 $this->info('Parallel tool execution: ENABLED');
             }
         }
+        
+        // Register all hooks before using them
+        $this->registerHooks($hooks, $wrap);
+        
+        // Handle planning if requested
+        $executionPlan = null;
+        if ($this->option('plan') && !$this->option('resume')) {
+            $planner = new Planner();
+            $this->info('Creating execution plan...');
+            $executionPlan = $planner->createPlan($task, $tools);
+            
+            // Trigger plan hook with raw plan data
+            $hooks->trigger('plan', $executionPlan);
+            
+            // Ask for confirmation
+            if (!$this->confirm('Do you want to proceed with this plan?')) {
+                $this->info('Execution cancelled.');
+                return;
+            }
+            $this->newLine();
+        }
 
+        // Create agent if not resuming
+        if (!$agent) {
+            $agent = new Agent(
+                tools: $tools,
+                goal: 'Current date:'.date('Y-m-d')."\n".
+                'Respond to the human as helpfully and accurately as possible.'.
+                'The human will ask you to do things, and you should do them.',
+                maxIterations: 20,
+                hooks: $hooks,
+                parallelEnabled: $this->option('parallel'),
+            );
+            
+            // Set execution plan if created
+            if ($executionPlan) {
+                $agent->setExecutionPlan($executionPlan);
+            }
+            
+            // Enable session if requested
+            if ($sessionId = $this->option('save-session')) {
+                if (!$sessionId || $sessionId === '1') {
+                    // Auto-generate ID from task
+                    $sessionId = Str::slug(Str::limit($task, 30)) . '-' . date('Y-m-d-His');
+                }
+                
+                $agent->enableSession($sessionId);
+                $this->info("Session ID: {$sessionId}");
+            }
+        }
+
+        $finalResponse = $agent->run($task);
+
+        // For fun.
+        if ($this->option('speak')) {
+            shell_exec('say '.escapeshellarg(Str::of($finalResponse)->replace("\n", ' ')->trim()));
+        }
+    }
+    
+    protected function registerHooks(Hooks $hooks, int $wrap): void
+    {
         $hooks->on('start', function ($task) {
             $this->newLine();
             $this->line('<fg=cyan>◆</> <fg=white;options=bold>Task:</> <fg=cyan>'.$task.'</>');
@@ -96,11 +158,12 @@ class RunAgent extends Command
                 }
             }
 
-            $this->line($icon.' '.$action['action'].$params);
+            $this->line($icon . ' ' . $action['action'] . $params);
         });
 
         $hooks->on('thought', function ($thought) {
-            $this->line('<fg=blue>◈</> <fg=gray>'.Str::limit($thought, 1000).'</>');
+            $wrapped = wordwrap($thought, 77, "\n   ");
+            $this->line('<fg=blue>◈</> <fg=gray>' . $wrapped . '</>');
         });
 
         $hooks->on('observation', function ($observation) {
@@ -139,10 +202,19 @@ class RunAgent extends Command
             } elseif (str_contains($observation, '[Skipped]')) {
                 // Show skip messages
                 $this->line('  <fg=yellow>⟐</> ' . str_replace('[Skipped] ', '', $observation));
-            } elseif (strlen($observation) > 200) {
-                $this->line('  <fg=gray>└─ '.Str::limit($observation, 80).'...</>');
             } else {
-                $this->line('  <fg=gray>└─ ' . $observation . '</>');
+                // Regular observations - properly indent multi-line content
+                $lines = explode("\n", $observation);
+                if (count($lines) > 1 || strlen($observation) > 77) {
+                    $this->line('   <fg=gray>↳ ' . array_shift($lines) . '</>');
+                    foreach ($lines as $line) {
+                        if (!empty(trim($line))) {
+                            $this->line('     <fg=gray>' . Str::limit($line, 75) . '</>');
+                        }
+                    }
+                } else {
+                    $this->line('   <fg=gray>↳ ' . $observation . '</>');
+                }
             }
         });
 
@@ -152,7 +224,10 @@ class RunAgent extends Command
             }
 
             if (isset($eval['status']) && $eval['status'] === 'completed') {
-                $this->line('<fg=green>◉</> <fg=green>'.($eval['feedback'] ?? 'Completed').'</>');
+                $feedback = $eval['feedback'] ?? 'Completed';
+                $wrapped = wordwrap($feedback, 77, "\n   ");
+                $this->line('<fg=green>◉</> <fg=white;options=bold>Evaluation:</>');
+                $this->line('   <fg=green>' . $wrapped . '</>');
             }
         });
 
@@ -164,7 +239,9 @@ class RunAgent extends Command
 
         $hooks->on('final_answer', function ($finalAnswer) use ($wrap) {
             $this->newLine();
-            $this->line('<fg=green>✓</> <fg=white;options=bold>Answer:</> '.wordwrap($finalAnswer, $wrap));
+            $wrapped = wordwrap($finalAnswer, 77, "\n   ");
+            $this->line('<fg=green>✓</> <fg=white;options=bold>Final answer:</>');
+            $this->line('   <fg=white>' . $wrapped . '</>');
             $this->newLine();
         });
         
@@ -175,36 +252,60 @@ class RunAgent extends Command
         $hooks->on('parallel_execution_complete', function ($count) {
             $this->line('<fg=magenta>⟐</> <fg=green>Parallel execution complete ('.$count.' results)</>');
         });
-
-        // Create agent if not resuming
-        if (!$agent) {
-            $agent = new Agent(
-                tools: $tools,
-                goal: 'Current date:'.date('Y-m-d')."\n".
-                'Respond to the human as helpfully and accurately as possible.'.
-                'The human will ask you to do things, and you should do them.',
-                maxIterations: 20,
-                hooks: $hooks,
-                parallelEnabled: $this->option('parallel'),
-            );
+        
+        $hooks->on('plan', function ($plan) {
+            $this->newLine();
+            $this->line('<fg=cyan>◍</> <fg=white;options=bold>Execution Plan</>');
+            $this->line('   <fg=gray>' . str_repeat('─', 60) . '</>');
             
-            // Enable session if requested
-            if ($sessionId = $this->option('save-session')) {
-                if (!$sessionId || $sessionId === '1') {
-                    // Auto-generate ID from task
-                    $sessionId = Str::slug(Str::limit($task, 30)) . '-' . date('Y-m-d-His');
+            // Summary
+            $wrapped = wordwrap($plan['summary'], 77, "\n   ");
+            $this->line('   <fg=white>' . $wrapped . '</>');
+            $this->newLine();
+            
+            // Metadata
+            $complexityColor = match($plan['complexity']) {
+                'simple' => 'green',
+                'moderate' => 'yellow',
+                'complex' => 'red',
+                default => 'gray'
+            };
+            
+            $this->line('   <fg=gray>Complexity:</> <fg=' . $complexityColor . ';options=bold>' . ucfirst($plan['complexity']) . '</>');
+            $this->line('   <fg=gray>Steps:</> <fg=white;options=bold>' . count($plan['steps']) . '</>');
+            $this->line('   <fg=gray>Estimated tools:</> <fg=white;options=bold>' . $plan['estimated_tools'] . '</>');
+            $this->newLine();
+            
+            // Steps
+            $this->line('   <fg=white;options=bold>Steps:</>');
+            $this->line('   <fg=gray>' . str_repeat('─', 60) . '</>');
+            
+            foreach ($plan['steps'] as $step) {
+                $this->newLine();
+                
+                // Step number and description
+                $stepDesc = wordwrap($step['description'], 70, "\n      ");
+                $this->line('   <fg=white;options=bold>' . $step['step_number'] . '.</> <fg=white>' . $stepDesc . '</>');
+                
+                // Tools
+                if (!empty($step['tools'])) {
+                    $this->line('      <fg=blue>Tools: ' . implode(', ', $step['tools']) . '</>');
                 }
                 
-                $agent->enableSession($sessionId);
-                $this->info("Session ID: {$sessionId}");
+                // Parallelization
+                if ($step['can_parallelize']) {
+                    $this->line('      <fg=magenta>⟐ Can run in parallel</>');
+                }
+                
+                // Dependencies
+                if (!empty($step['depends_on'])) {
+                    $this->line('      <fg=gray>Depends on: Step ' . implode(', ', $step['depends_on']) . '</>');
+                }
             }
-        }
-
-        $finalResponse = $agent->run($task);
-
-        // For fun.
-        if ($this->option('speak')) {
-            shell_exec('say '.escapeshellarg(Str::of($finalResponse)->replace("\n", ' ')->trim()));
-        }
+            
+            $this->newLine();
+            $this->line('   <fg=gray>' . str_repeat('─', 60) . '</>');
+            $this->newLine();
+        });
     }
 }

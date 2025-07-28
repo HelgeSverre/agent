@@ -33,6 +33,8 @@ class Agent
     protected array $recentlyExecutedTools = [];
     
     protected int $parallelExecutionCount = 0;
+    
+    protected ?array $executionPlan = null;
 
     /**
      * @param  array|Tool[]  $tools
@@ -59,6 +61,11 @@ class Agent
     {
         $this->sessionId = $sessionId;
         $this->sessionManager = new SessionManager();
+    }
+    
+    public function setExecutionPlan(array $plan): void
+    {
+        $this->executionPlan = $plan;
     }
     
     public static function fromSession(string $sessionId, array $tools = [], ?Hooks $hooks = null): ?self
@@ -383,6 +390,7 @@ class Agent
             goal: $this->goal,
             tools: $this->tools,
             intermediateSteps: $this->intermediateSteps,
+            executionPlan: $this->executionPlan
         )->evaluateTaskCompletion();
 
         $response = LLM::json($prompt);
@@ -405,6 +413,7 @@ class Agent
             goal: $this->goal,
             tools: $this->tools,
             intermediateSteps: $this->intermediateSteps,
+            executionPlan: $this->executionPlan
         )->decideNextStep();
 
         $this->hooks?->trigger('prompt', $prompt);
