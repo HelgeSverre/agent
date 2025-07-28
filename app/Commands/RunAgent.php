@@ -15,19 +15,45 @@ use LaravelZero\Framework\Commands\Command;
 
 class RunAgent extends Command
 {
-    protected $signature = 'run {task?} {--speak : Speak the final answer using the system\'s text-to-speech}';
+    protected $signature = 'run {task?} 
+        {--speak : Speak the final answer using the system\'s text-to-speech}
+        {--save-session= : Save session with ID}
+        {--resume= : Resume session by ID}';
 
     public function handle(): void
     {
-        $task = $this->argument('task');
-
-        if (! $task) {
-            $task = $this->ask('What do you want to do?');
-        }
-
         $wrap = 120;
-
         $hooks = new Hooks;
+        $agent = null;
+        
+        // Define tools array
+        $tools = [
+            new ReadFileTool,
+            new WriteFileTool(base_path('output')),
+            new SearchWebTool,
+            new BrowseWebsiteTool,
+            new RunCommandTool,
+            new SpeakTool,
+        ];
+        
+        // Check for resume first
+        if ($resumeId = $this->option('resume')) {
+            $agent = Agent::fromSession($resumeId, $tools, $hooks);
+            
+            if (!$agent) {
+                $this->error("Session not found: {$resumeId}");
+                return;
+            }
+            
+            $this->info("Resuming session: {$resumeId}");
+            $task = 'Resuming previous task';
+        } else {
+            $task = $this->argument('task');
+            
+            if (!$task) {
+                $task = $this->ask('What do you want to do?');
+            }
+        }
 
         $hooks->on('start', function ($task) {
             $this->newLine();
@@ -99,21 +125,28 @@ class RunAgent extends Command
             $this->newLine();
         });
 
-        $agent = new Agent(
-            tools: [
-                new ReadFileTool,
-                new WriteFileTool(base_path('output')),
-                new SearchWebTool,
-                new BrowseWebsiteTool,
-                new RunCommandTool,
-                new SpeakTool,
-            ],
-            goal: 'Current date:'.date('Y-m-d')."\n".
-            'Respond to the human as helpfully and accurately as possible.'.
-            'The human will ask you to do things, and you should do them.',
-            maxIterations: 20,
-            hooks: $hooks,
-        );
+        // Create agent if not resuming
+        if (!$agent) {
+            $agent = new Agent(
+                tools: $tools,
+                goal: 'Current date:'.date('Y-m-d')."\n".
+                'Respond to the human as helpfully and accurately as possible.'.
+                'The human will ask you to do things, and you should do them.',
+                maxIterations: 20,
+                hooks: $hooks,
+            );
+            
+            // Enable session if requested
+            if ($sessionId = $this->option('save-session')) {
+                if (!$sessionId || $sessionId === '1') {
+                    // Auto-generate ID from task
+                    $sessionId = Str::slug(Str::limit($task, 30)) . '-' . date('Y-m-d-His');
+                }
+                
+                $agent->enableSession($sessionId);
+                $this->info("Session ID: {$sessionId}");
+            }
+        }
 
         $finalResponse = $agent->run($task);
 

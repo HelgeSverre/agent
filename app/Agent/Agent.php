@@ -2,6 +2,8 @@
 
 namespace App\Agent;
 
+use App\Agent\Session\AgentState;
+use App\Agent\Session\SessionManager;
 use App\Agent\Tool\Tool;
 use Exception;
 
@@ -16,6 +18,12 @@ class Agent
     protected int $currentIteration = 0;
 
     protected array $toolsSchema = [];
+    
+    protected ?string $sessionId = null;
+    
+    protected ?SessionManager $sessionManager = null;
+    
+    protected ?string $task = null;
 
     /**
      * @param  array|Tool[]  $tools
@@ -27,6 +35,39 @@ class Agent
         protected ?Hooks $hooks = null,
     ) {
         $this->prepareToolsSchema();
+    }
+    
+    public function enableSession(string $sessionId): void
+    {
+        $this->sessionId = $sessionId;
+        $this->sessionManager = new SessionManager();
+    }
+    
+    public static function fromSession(string $sessionId, array $tools = [], ?Hooks $hooks = null): ?self
+    {
+        $manager = new SessionManager();
+        $data = $manager->load($sessionId);
+        
+        if (!$data) {
+            return null;
+        }
+        
+        $state = AgentState::fromArray($data);
+        
+        $agent = new self(
+            tools: $tools,
+            goal: $state->goal,
+            maxIterations: 10,
+            hooks: $hooks
+        );
+        
+        // Restore state
+        $agent->task = $state->task;
+        $agent->intermediateSteps = $state->intermediateSteps;
+        $agent->currentIteration = $state->currentIteration;
+        $agent->enableSession($sessionId);
+        
+        return $agent;
     }
 
     protected function prepareToolsSchema(): void
@@ -67,6 +108,7 @@ class Agent
 
     public function run(string $task)
     {
+        $this->task = $task;
         $this->hooks?->trigger('start', $task);
 
         while (! $this->isTaskCompleted) {
@@ -206,5 +248,18 @@ class Agent
     protected function recordStep(string $type, mixed $content)
     {
         $this->intermediateSteps[] = ['type' => $type, 'content' => $content];
+        
+        // Auto-save if session enabled
+        if ($this->sessionId && $this->sessionManager) {
+            $state = new AgentState(
+                task: $this->task ?? '',
+                intermediateSteps: $this->intermediateSteps,
+                currentIteration: $this->currentIteration,
+                goal: $this->goal,
+                status: $this->isTaskCompleted ? 'completed' : 'running'
+            );
+            
+            $this->sessionManager->save($this->sessionId, $state->toArray());
+        }
     }
 }

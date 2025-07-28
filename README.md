@@ -30,10 +30,11 @@ composer install
 
 ## Configuration
 
-Set your OpenAI API key in your `.env` file:
+Set your API keys in your `.env` file:
 
 ```env
 OPENAI_API_KEY=your-api-key-here
+BRAVE_API_KEY=your-brave-search-api-key  # Optional, for web search functionality
 ```
 
 ## Key Features
@@ -42,9 +43,11 @@ OPENAI_API_KEY=your-api-key-here
 - **Error Recovery**: Graceful handling of failures with automatic retries
 - **Enhanced Prompting**: Markdown-based prompts for better model comprehension
 - **Context Management**: Automatic conversation history tracking
+- **Session Persistence**: Save and resume agent tasks across runs
 - **Minimal Terminal Display**: Clean, colored symbol-based output
 - **Hook System**: Monitor and customize agent behavior in real-time
 - **Built-in Tools**: Web search, website browsing, file I/O, and command execution
+- **PHP Attributes**: Clean tool creation with `#[AsTool]` attributes
 
 ## Quick Start Guide
 
@@ -59,6 +62,15 @@ php agent run
 
 # Enable text-to-speech for the final answer (macOS only)
 php agent run "What is the weather today?" --speak
+
+# Save session with custom ID
+php agent run "Complex research task" --save-session=research-project
+
+# Save session with auto-generated ID
+php agent run "Analyze codebase" --save-session=1
+
+# Resume a saved session
+php agent run --resume=research-project
 ```
 
 ### More Examples
@@ -150,13 +162,16 @@ Tools are the building blocks of agent capabilities. Here's how to create a cust
 - Examples: `get_weather`, `search_web`, `read-file`
 
 ```php
-use App\Agent\Tool\Description;
+use App\Agent\Tool\Attributes\AsTool;
+use App\Agent\Tool\Attributes\Description;
 use App\Agent\Tool\Tool;
 
+#[AsTool(
+    name: 'get_weather',  // REQUIRED: Use underscores, no spaces!
+    description: 'Get the current weather for a location'
+)]
 class WeatherTool extends Tool
 {
-    protected string $name = 'get_weather';  // REQUIRED: Use underscores, no spaces!
-    protected string $description = 'Get the current weather for a location';
 
     public function run(
         #[Description('The city to get weather for')]
@@ -184,10 +199,12 @@ class WeatherTool extends Tool
 ### Example: Adding a Database Query Tool
 
 ```php
+#[AsTool(
+    name: 'query_database',
+    description: 'Execute safe read-only database queries'
+)]
 class DatabaseQueryTool extends Tool
 {
-    protected string $name = 'query_database';
-    protected string $description = 'Execute safe read-only database queries';
     
     public function run(
         #[Description('The SQL query to execute (SELECT only)')]
@@ -366,15 +383,67 @@ $agent = new Agent(
 $result = $agent->run('Create a summary of recent tech news');
 ```
 
+## Session Persistence
+
+The agent supports saving and resuming tasks across runs, allowing you to:
+- Interrupt long-running tasks and resume them later
+- Share agent sessions between team members
+- Debug agent behavior by inspecting saved states
+- Build task history and audit trails
+
+### Saving Sessions
+
+```bash
+# Save with custom session ID
+php agent run "Research PHP frameworks" --save-session=php-research
+
+# Save with auto-generated ID (based on task and timestamp)
+php agent run "Analyze codebase" --save-session=1
+```
+
+### Resuming Sessions
+
+```bash
+# Resume a previously saved session
+php agent run --resume=php-research
+
+# The agent will continue from where it left off,
+# maintaining all context and previous steps
+```
+
+### Session Storage
+
+Sessions are stored as JSON files in `storage/agent-sessions/`:
+- Each session includes the task, steps taken, and current state
+- Files are human-readable for debugging
+- Sessions persist across system restarts
+
+### Programmatic Usage
+
+```php
+use App\Agent\Agent;
+
+// Enable session saving
+$agent = new Agent($tools, $goal, $maxIterations, $hooks);
+$agent->enableSession('my-session-id');
+
+// Resume from session
+$agent = Agent::fromSession('my-session-id', $tools, $hooks);
+if ($agent) {
+    $result = $agent->run('Continue previous task');
+}
+```
+
 ## Available Tools
 
 The framework includes several built-in tools:
 
-- **SearchWebTool** (`search_web`): Search the web for information using DuckDuckGo
+- **SearchWebTool** (`search_web`): Search the web for information using Brave Search API
 - **BrowseWebsiteTool** (`browse_website`): Extract text content from websites
 - **ReadFileTool** (`read_file`): Read file contents from the output directory
 - **WriteFileTool** (`write_file`): Create or update files in the output directory
 - **RunCommandTool** (`run_command`): Execute system commands safely
+- **SpeakTool** (`speak`): Text-to-speech output (macOS only)
 
 ## Advanced Configuration
 
@@ -451,7 +520,6 @@ composer test -- --filter=AgentTest
 - Web browsing extracts text only (no JavaScript execution)
 - Command execution is sandboxed for safety
 - Context window limits long conversations
-- No persistent memory between sessions
 
 ## License
 
