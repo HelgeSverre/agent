@@ -44,6 +44,7 @@ BRAVE_API_KEY=your-brave-search-api-key  # Optional, for web search functionalit
 - **Enhanced Prompting**: Markdown-based prompts for better model comprehension
 - **Context Management**: Automatic conversation history tracking
 - **Session Persistence**: Save and resume agent tasks across runs
+- **Parallel Tool Execution**: Execute independent tools simultaneously (opt-in with --parallel flag)
 - **Minimal Terminal Display**: Clean, colored symbol-based output
 - **Hook System**: Monitor and customize agent behavior in real-time
 - **Built-in Tools**: Web search, website browsing, file I/O, and command execution
@@ -71,6 +72,12 @@ php agent run "Analyze codebase" --save-session=1
 
 # Resume a saved session
 php agent run --resume=research-project
+
+# Enable parallel tool execution (opt-in)
+php agent run "Search for 'PHP' and 'Laravel' simultaneously" --parallel
+
+# Parallel execution with environment variable
+AGENT_PARALLEL_ENABLED=true php agent run "Read multiple files at the same time"
 ```
 
 ### More Examples
@@ -87,6 +94,10 @@ php agent run "Search for the top 3 PHP frameworks in 2024 and compare them"
 
 # System information
 php agent run "Check the current PHP version and list installed extensions"
+
+# Parallel operations (requires --parallel flag)
+php agent run "Search for 'testing tools' and 'PHP frameworks' at the same time" --parallel
+php agent run "Read README.md and CHANGELOG.md simultaneously" --parallel
 ```
 
 ### Basic Agent Usage
@@ -135,8 +146,11 @@ The agent uses a minimal display with colored symbols:
 - ⬣ Read file (yellow hexagon)
 - ⬤ Write file (magenta circle)
 - ⬥ Run command (cyan diamond)
+- ⟐ Parallel execution (magenta parallel lines)
 - ◉ Task evaluation (green circle)
 - ✓ Final answer (green checkmark)
+- [✓] Successful parallel tool (green)
+- [✗] Failed parallel tool (red)
 
 Example output:
 
@@ -433,6 +447,58 @@ if ($agent) {
     $result = $agent->run('Continue previous task');
 }
 ```
+
+## Parallel Tool Execution
+
+The agent supports executing multiple independent tools simultaneously for improved performance. This feature is opt-in to maintain backward compatibility.
+
+### Enabling Parallel Execution
+
+```bash
+# Use the --parallel flag
+php agent run "Search for 'PHP testing' and 'Laravel testing' simultaneously" --parallel
+
+# Or use environment variable
+AGENT_PARALLEL_ENABLED=true php agent run "Read multiple files at the same time"
+```
+
+### How It Works
+
+- The agent detects parallel opportunities from keywords like "simultaneously", "at the same time", "both X and Y"
+- Tools are executed in isolated processes (up to 4 concurrent)
+- Results are collected and presented together
+- Failed tools are tracked to prevent re-execution loops
+
+### Configuration
+
+```php
+// config/app.php
+'parallel_execution' => [
+    'enabled' => env('AGENT_PARALLEL_ENABLED', false),
+    'max_processes' => env('AGENT_MAX_PARALLEL', 4),
+    'timeout' => env('AGENT_TOOL_TIMEOUT', 30),
+],
+```
+
+### Programmatic Usage
+
+```php
+$agent = new Agent(
+    tools: $tools,
+    goal: $goal,
+    maxIterations: 20,
+    hooks: $hooks,
+    parallelEnabled: true  // Enable parallel execution
+);
+```
+
+### Visual Output
+
+When tools execute in parallel, you'll see:
+- ⟐ Cyan indicators for queuing and parallel operations
+- [✓] Green checkmarks for successful tool execution
+- [✗] Red X marks for failed tool execution
+- Clear summaries of what was executed and the results
 
 ## Available Tools
 
