@@ -5,6 +5,7 @@ This document describes the WebSocket server implementation for real-time commun
 ## Overview
 
 The WebUI server provides:
+
 - Real-time bidirectional communication via WebSocket
 - Live streaming of agent activity and thoughts
 - Task execution through the web interface
@@ -16,24 +17,24 @@ The WebUI server provides:
 ### Components
 
 1. **WebUIServer Command** (`app/Commands/WebUIServer.php`)
-   - Main entry point for starting the WebSocket server
-   - Integrates with Laravel Zero command structure
-   - Configurable host and port
+    - Main entry point for starting the WebSocket server
+    - Integrates with Laravel Zero command structure
+    - Configurable host and port
 
 2. **WebSocketHandler** (`app/WebUI/WebSocketHandler.php`)
-   - Handles WebSocket connections and messages
-   - Manages client connections and sessions
-   - Coordinates with MessageHandler for request processing
+    - Handles WebSocket connections and messages
+    - Manages client connections and sessions
+    - Coordinates with MessageHandler for request processing
 
 3. **MessageHandler** (`app/WebUI/Messages/MessageHandler.php`)
-   - Processes different message types from clients
-   - Executes tasks through the Agent class
-   - Sets up hooks for real-time activity streaming
+    - Processes different message types from clients
+    - Executes tasks through the Agent class
+    - Sets up hooks for real-time activity streaming
 
 4. **WebUISessionManager** (`app/WebUI/Session/WebUISessionManager.php`)
-   - Manages WebSocket sessions
-   - Tracks connection state and task history
-   - Provides session cleanup and maintenance
+    - Manages WebSocket sessions
+    - Tracks connection state and task history
+    - Provides session cleanup and maintenance
 
 ## Usage
 
@@ -53,6 +54,7 @@ php agent run --web
 ### Frontend Connection
 
 The `webui.html` file automatically connects to `ws://127.0.0.1:8080` and provides:
+
 - Command input interface
 - Real-time activity streaming with tool-specific icons
 - Streaming tool calls with inline results
@@ -64,6 +66,7 @@ The `webui.html` file automatically connects to `ws://127.0.0.1:8080` and provid
 ### Client to Server Messages
 
 #### Execute Task
+
 ```json
 {
     "type": "execute_task",
@@ -77,6 +80,7 @@ The `webui.html` file automatically connects to `ws://127.0.0.1:8080` and provid
 ```
 
 #### Get Status
+
 ```json
 {
     "type": "get_status"
@@ -84,6 +88,7 @@ The `webui.html` file automatically connects to `ws://127.0.0.1:8080` and provid
 ```
 
 #### Cancel Task
+
 ```json
 {
     "type": "cancel_task",
@@ -92,6 +97,7 @@ The `webui.html` file automatically connects to `ws://127.0.0.1:8080` and provid
 ```
 
 #### Ping
+
 ```json
 {
     "type": "ping"
@@ -101,6 +107,7 @@ The `webui.html` file automatically connects to `ws://127.0.0.1:8080` and provid
 ### Server to Client Messages
 
 #### Welcome
+
 ```json
 {
     "type": "welcome",
@@ -111,6 +118,7 @@ The `webui.html` file automatically connects to `ws://127.0.0.1:8080` and provid
 ```
 
 #### Task Started
+
 ```json
 {
     "type": "task_started",
@@ -122,6 +130,7 @@ The `webui.html` file automatically connects to `ws://127.0.0.1:8080` and provid
 ```
 
 #### Task Completed
+
 ```json
 {
     "type": "task_completed",
@@ -133,6 +142,7 @@ The `webui.html` file automatically connects to `ws://127.0.0.1:8080` and provid
 ```
 
 #### Activity Stream
+
 ```json
 {
     "type": "activity",
@@ -148,6 +158,7 @@ The `webui.html` file automatically connects to `ws://127.0.0.1:8080` and provid
 ```
 
 #### Status Updates
+
 ```json
 {
     "type": "status",
@@ -178,6 +189,7 @@ The server streams various activity types in real-time:
 ### Dependencies
 
 Add to `composer.json`:
+
 ```json
 {
     "require": {
@@ -198,6 +210,7 @@ Add to `composer.json`:
 ### Frontend Configuration
 
 Update WebSocket URL in `webui.html` if using custom host/port:
+
 ```javascript
 const wsUrl = `${protocol}//YOUR_HOST:YOUR_PORT`;
 ```
@@ -205,24 +218,28 @@ const wsUrl = `${protocol}//YOUR_HOST:YOUR_PORT`;
 ## Features
 
 ### Real-time Activity Streaming
+
 - Live display of agent thoughts and actions
 - Tool execution progress
 - Context management events
 - Error handling and recovery
 
 ### Session Management
+
 - Unique session IDs for each connection
 - Task history tracking
 - Automatic cleanup of expired sessions
 - Connection state management
 
 ### Error Handling
+
 - Graceful error recovery
 - Automatic reconnection attempts
 - Circuit breaker integration
 - Comprehensive error logging
 
 ### Connection Management
+
 - Multiple concurrent connections
 - Connection heartbeat/ping
 - Proper cleanup on disconnect
@@ -231,14 +248,18 @@ const wsUrl = `${protocol}//YOUR_HOST:YOUR_PORT`;
 ## Integration Points
 
 ### Agent Class Integration
+
 The WebSocket server integrates seamlessly with the existing Agent class:
+
 - Uses same tool array and configuration
 - Leverages existing Hooks system
 - Maintains session compatibility
 - Supports all agent features (parallel execution, planning, etc.)
 
 ### Tool Execution
+
 All existing tools work through the WebSocket interface:
+
 - ReadFileTool
 - WriteFileTool
 - SearchWebTool
@@ -247,7 +268,9 @@ All existing tools work through the WebSocket interface:
 - SpeakTool
 
 ### Hooks System
+
 Comprehensive hook integration provides real-time updates for:
+
 - Task lifecycle events
 - Tool executions
 - Agent reasoning
@@ -259,11 +282,11 @@ Comprehensive hook integration provides real-time updates for:
 - Server binds to localhost by default
 - No authentication implemented (suitable for development)
 - For production use, consider adding:
-  - Authentication/authorization
-  - Rate limiting
-  - Input validation
-  - CORS policy
-  - SSL/TLS support
+    - Authentication/authorization
+    - Rate limiting
+    - Input validation
+    - CORS policy
+    - SSL/TLS support
 
 ## Performance
 
@@ -276,6 +299,7 @@ Comprehensive hook integration provides real-time updates for:
 ## Development
 
 ### Testing
+
 ```bash
 # Start the server
 php agent webui:server
@@ -285,6 +309,7 @@ php agent webui:server
 ```
 
 ### Debugging
+
 - Server logs connections and errors to console
 - Browser developer tools show WebSocket communication
 - Laravel logs available for detailed debugging

@@ -7,22 +7,25 @@ A real-time web interface has been implemented for the PHP Agent Framework, allo
 ## Features Implemented
 
 ### 1. WebSocket Server
+
 - **Command**: `php agent web` or `php agent run --web`
 - **Default Port**: 8080 (configurable with `--port`)
 - **Host**: 127.0.0.1 (configurable with `--host`)
 - **Auto-open**: Browser opens automatically with `--open` flag
 
 ### 2. Real-time Communication
+
 - Bidirectional WebSocket connection
 - Live streaming of agent activities:
-  - Commands and responses
-  - Tool executions with parameters
-  - Agent thoughts and observations
-  - Task progress tracking
+    - Commands and responses
+    - Tool executions with parameters
+    - Agent thoughts and observations
+    - Task progress tracking
 - Automatic reconnection with retry logic
 - Connection status indicator
 
 ### 3. User Interface
+
 - **Modern Terminal Style**: Dark theme with monospace font
 - **Activity Timeline**: Shows all agent activities with timestamps and tool-specific icons
 - **Streaming Tool Calls**: Tool calls show inline with parameters, then results slide in below (matching CLI output style)
@@ -30,40 +33,41 @@ A real-time web interface has been implemented for the PHP Agent Framework, allo
 - **Interactive Input**: Command prompt with real-time response
 
 ### 4. Agent Integration
+
 - Full integration with existing Agent class
 - All tools work through WebSocket
 - Hook system provides real-time updates
 - Supports all agent features:
-  - Parallel execution
-  - Session management
-  - Planning mode
-  - Context compression
-  - Circuit breaker protection
+    - Parallel execution
+    - Session management
+    - Planning mode
+    - Context compression
+    - Circuit breaker protection
 
 ## Architecture
 
 ### Backend Components
 
 1. **WebUIServer Command** (`app/Commands/WebUIServer.php`)
-   - Laravel command to start WebSocket server
-   - Handles server initialization and browser opening
+    - Laravel command to start WebSocket server
+    - Handles server initialization and browser opening
 
 2. **AgentWebSocketHandler** (`app/WebSocket/AgentWebSocketHandler.php`)
-   - Implements Ratchet MessageComponentInterface
-   - Manages WebSocket connections
-   - Handles message routing and agent execution
+    - Implements Ratchet MessageComponentInterface
+    - Manages WebSocket connections
+    - Handles message routing and agent execution
 
 3. **Integration with RunAgent**
-   - `--web` flag redirects to WebUI server
-   - Seamless switching between CLI and Web modes
+    - `--web` flag redirects to WebUI server
+    - Seamless switching between CLI and Web modes
 
 ### Frontend Components
 
 1. **webui.html** (`public/webui.html`)
-   - Single-page application
-   - WebSocket client implementation
-   - Real-time UI updates
-   - Responsive design
+    - Single-page application
+    - WebSocket client implementation
+    - Real-time UI updates
+    - Responsive design
 
 ### Message Protocol
 
@@ -111,18 +115,21 @@ php agent web --no-open
 ## Technical Details
 
 ### Dependencies Added
+
 - `cboden/ratchet`: WebSocket server implementation
 - `react/event-loop`: Async event loop
 - `react/socket`: Socket server
 - `react/http`: HTTP server layer
 
 ### Security Considerations
+
 - Default binding to localhost only
 - No authentication (development use)
 - Input validation on server side
 - Proper error handling and connection cleanup
 
 ### Performance
+
 - Lightweight WebSocket protocol
 - Minimal overhead for real-time updates
 - Efficient message serialization
@@ -140,11 +147,13 @@ php agent web --no-open
 ## Troubleshooting
 
 ### Connection Issues
+
 - Ensure port 8080 is not in use
 - Check firewall settings
 - Verify WebSocket support in browser
 
 ### Performance Issues
+
 - Monitor connection count
 - Check for memory leaks in long sessions
 - Review agent iteration limits
