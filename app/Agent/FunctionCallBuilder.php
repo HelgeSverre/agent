@@ -20,17 +20,17 @@ class FunctionCallBuilder
     {
         $this->prompt = $prompt;
 
-        // Create functions array for OpenAI
-        $functions = [];
+        // Build tool definitions from functions
+        $toolDefinitions = [];
 
-        // Add all tool functions
         if (isset($this->tools['functions'])) {
-            $functions = array_merge($functions, $this->tools['functions']);
+            foreach ($this->tools['functions'] as $fn) {
+                $toolDefinitions[] = ['type' => 'function', 'function' => $fn];
+            }
         }
 
-        // Add final_answer function if provided
         if (isset($this->tools['final_answer'])) {
-            $functions[] = $this->tools['final_answer'];
+            $toolDefinitions[] = ['type' => 'function', 'function' => $this->tools['final_answer']];
         }
 
         try {
@@ -42,19 +42,21 @@ class FunctionCallBuilder
                         'content' => $prompt,
                     ],
                 ],
-                'functions' => $functions,
-                'function_call' => 'auto',
+                'tools' => $toolDefinitions,
+                'tool_choice' => 'auto',
             ]);
 
             // Process the response
             $message = $response->choices[0]->message;
 
-            // Check if there's a function call
-            if (isset($message->functionCall)) {
+            // Check if there's a tool call
+            if (isset($message->toolCalls) && count($message->toolCalls) > 0) {
+                $toolCall = $message->toolCalls[0];
+
                 return [
                     'function_call' => [
-                        'name' => $message->functionCall->name,
-                        'arguments' => json_decode($message->functionCall->arguments, true),
+                        'name' => $toolCall->function->name,
+                        'arguments' => json_decode($toolCall->function->arguments, true),
                     ],
                     'thought' => $message->content ?? null,
                 ];
