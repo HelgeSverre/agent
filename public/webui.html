@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent - AI Coding Assistant</title>
+    <style>
+        :root {
+            --bg-dark: #0a0a0a;
+            --bg-panel: #141414;
+            --bg-hover: #1f1f1f;
+            --border-color: #2a2a2a;
+            --text-primary: #e0e0e0;
+            --text-secondary: #999;
+            --text-dim: #666;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-yellow: #f59e0b;
+            --accent-red: #ef4444;
+            --accent-cyan: #06b6d4;
+            --accent-magenta: #a855f7;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+            font-size: 13px;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Main Area */
+        .main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border-color);
+        }
+
+        .status-bar {
+            background: var(--bg-panel);
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .status-bar .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+        }
+
+        .status-bar .divider {
+            color: var(--text-dim);
+        }
+
+        .status-bar .task-status {
+            color: var(--accent-green);
+        }
+
+        .status-bar .operation {
+            color: var(--accent-yellow);
+            margin-left: auto;
+        }
+
+        /* Activity Area */
+        .activity-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .activity-item {
+            margin-bottom: 12px;
+            display: flex;
+            gap: 12px;
+            line-height: 1.5;
+            animation: fadeIn 150ms;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .activity-time {
+            color: var(--text-dim);
+            font-size: 11px;
+            min-width: 60px;
+        }
+
+        .activity-icon {
+            min-width: 20px;
+            text-align: center;
+        }
+
+        .activity-content {
+            flex: 1;
+            word-break: break-word;
+            white-space: break-spaces;
+        }
+
+        .activity-command { color: var(--accent-blue); }
+        .activity-status { color: var(--accent-green); }
+        .activity-tool { color: var(--accent-cyan); }
+        .activity-error { color: var(--accent-red); }
+        .activity-assistant { color: var(--accent-green); }
+
+        /* Thinking display */
+        .activity-thought {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        /* Tool execution states */
+        .tool-executing {
+            opacity: 0.8;
+        }
+
+        .tool-executing .activity-icon::after {
+            content: '\2026';
+            animation: pulse 1s infinite;
+        }
+
+        .tool-result {
+            margin-top: 4px;
+            padding-left: 32px;
+            color: var(--text-secondary);
+            font-size: 12px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 200ms ease;
+        }
+
+        .tool-result.visible {
+            max-height: 200px;
+        }
+
+        .tool-result.success {
+            color: var(--text-secondary);
+        }
+
+        .tool-result.error {
+            color: var(--accent-red);
+        }
+
+        .tool-execution-time {
+            color: var(--text-dim);
+            font-size: 11px;
+            margin-left: 8px;
+        }
+
+        /* Final answer */
+        .final-answer-label {
+            color: var(--accent-green);
+            font-weight: 600;
+        }
+
+        .final-answer-content {
+            margin-top: 4px;
+            color: var(--text-primary);
+            font-weight: normal;
+            line-height: 1.6;
+            white-space: break-spaces;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        /* Input Area */
+        .input-area {
+            background: var(--bg-panel);
+            border-top: 1px solid var(--border-color);
+            padding: 12px 16px;
+        }
+
+        .input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .input-prompt {
+            color: var(--accent-blue);
+            font-weight: 600;
+        }
+
+        .input-field {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font: inherit;
+            outline: none;
+        }
+
+        .input-hints {
+            margin-top: 4px;
+            color: var(--text-dim);
+            font-size: 11px;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 300px;
+            background: var(--bg-panel);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Task Queue */
+        .task-queue {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+        }
+
+        .section-header {
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+        }
+
+        .task-stats {
+            color: var(--text-secondary);
+            font-size: 12px;
+            margin-bottom: 16px;
+        }
+
+        .task-list {
+            list-style: none;
+        }
+
+        .task-item {
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .task-item:last-child {
+            border-bottom: none;
+        }
+
+        .task-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .task-header:hover {
+            background: var(--bg-hover);
+            margin: 0 -8px;
+            padding: 0 8px;
+        }
+
+        .task-number {
+            color: var(--text-dim);
+            min-width: 24px;
+        }
+
+        .task-icon {
+            min-width: 16px;
+        }
+
+        .task-description {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .task-completed { color: var(--accent-green); }
+        .task-running { color: var(--accent-yellow); }
+        .task-pending { color: var(--text-dim); }
+        .task-error-status { color: var(--accent-red); }
+
+        .task-elapsed {
+            color: var(--text-dim);
+            font-size: 11px;
+            margin-left: auto;
+        }
+
+        .task-steps {
+            list-style: none;
+            margin-top: 4px;
+            padding-left: 32px;
+        }
+
+        .task-step {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 2px 0;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .task-step-icon {
+            min-width: 14px;
+            text-align: center;
+            font-size: 11px;
+        }
+
+        /* Animations */
+        .typing-indicator {
+            display: inline-block;
+        }
+
+        .typing-indicator span {
+            display: inline-block;
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: var(--text-secondary);
+            margin: 0 2px;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        .processing {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="main-area">
+        <div class="status-bar">
+            <div class="logo">
+                <span>&gt;_</span>
+                <span>agent</span>
+            </div>
+            <span class="divider">|</span>
+            <span class="task-status">
+                <span id="currentTaskIcon">●</span>
+                <span id="currentTask">Ready</span>
+            </span>
+            <span class="divider">|</span>
+            <span class="operation" id="operation">idle</span>
+        </div>
+
+        <div class="activity-area" id="activityArea">
+            <!-- Activity items will be added here -->
+        </div>
+
+        <div class="input-area">
+            <div class="input-wrapper">
+                <span class="input-prompt">agent ></span>
+                <input type="text" class="input-field" id="inputField" placeholder="Enter a command or request..."
+                       autofocus>
+            </div>
+        </div>
+    </div>
+
+    <div class="sidebar">
+        <div class="task-queue">
+            <h3 class="section-header">Task Queue</h3>
+            <div class="task-stats">
+                <span id="runningCount">0</span> running,
+                <span id="pendingCount">0</span> pending
+            </div>
+            <ul class="task-list" id="taskList">
+                <!-- Tasks will be added here -->
+            </ul>
+        </div>
+    </div>
+</div>
+
+<script>
+    // WebSocket connection
+    let ws = null;
+    let reconnectAttempts = 0;
+    let maxReconnectAttempts = 5;
+    let reconnectDelay = 1000;
+    let sessionId = null;
+    let currentTaskId = null;
+
+    // State
+    let isProcessing = false;
+    let tasks = [];
+    let lastToolElement = null;
+    let lastToolCompleted = false; // track if tool_success/error already filled the result
+
+    // Tool-specific icons (matching CLI RunAgent.php)
+    const toolIcons = {
+        search_web: '\u2B21',    // ⬡
+        browse_website: '\u2B22', // ⬢
+        read_file: '\u2B23',     // ⬣
+        write_file: '\u00BB',    // »
+        run_command: '\u2B25',   // ⬥
+        speak: '\u25B6',         // ▶
+        final_answer: '\u2713',  // ✓
+        default: '\u2022'        // •
+    };
+
+    function getToolIcon(toolName) {
+        return toolIcons[toolName] || toolIcons.default;
+    }
+
+    function truncate(str, maxLen) {
+        if (!str) return '';
+        str = String(str);
+        return str.length > maxLen ? str.substring(0, maxLen) + '...' : str;
+    }
+
+    function basename(path) {
+        if (!path) return '';
+        return String(path).split('/').pop();
+    }
+
+    function getToolParams(action, input) {
+        if (!input) return '';
+        if (input.searchTerm) return '"' + truncate(input.searchTerm, 40) + '"';
+        if (input.url) {
+            try { return new URL(input.url).hostname; } catch(e) { return truncate(input.url, 40); }
+        }
+        if (input.file_path) return basename(input.file_path);
+        if (input.filename) return input.filename;
+        if (input.command) return truncate(input.command, 40);
+        if (input.message) return truncate(input.message, 40);
+        // Fallback: show first string value
+        for (const key of Object.keys(input)) {
+            if (typeof input[key] === 'string' && input[key].length > 0) {
+                return truncate(input[key], 40);
+            }
+        }
+        return '';
+    }
+
+    function formatElapsed(startTime) {
+        const elapsed = Math.round((Date.now() - startTime) / 1000);
+        if (elapsed < 60) return elapsed + 's';
+        return Math.floor(elapsed / 60) + 'm ' + (elapsed % 60) + 's';
+    }
+
+    // Initialize WebSocket connection
+    connectWebSocket();
+
+    function connectWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}`;
+
+        try {
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = function(event) {
+                console.log('WebSocket connected');
+                reconnectAttempts = 0;
+                addActivity('system', 'Connected to Agent server');
+            };
+
+            ws.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    handleWebSocketMessage(data);
+                } catch (e) {
+                    console.error('Failed to parse WebSocket message:', e);
+                }
+            };
+
+            ws.onclose = function(event) {
+                console.log('WebSocket disconnected');
+                addActivity('system', 'Disconnected from server');
+
+                if (reconnectAttempts < maxReconnectAttempts) {
+                    setTimeout(() => {
+                        reconnectAttempts++;
+                        addActivity('system', `Reconnecting... (${reconnectAttempts}/${maxReconnectAttempts})`);
+                        connectWebSocket();
+                    }, reconnectDelay * reconnectAttempts);
+                } else {
+                    addActivity('system', 'Max reconnection attempts reached. Please refresh the page.');
+                }
+            };
+
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                addActivity('system', 'Connection error occurred');
+            };
+
+        } catch (e) {
+            console.error('Failed to connect WebSocket:', e);
+            addActivity('system', 'Failed to connect to server. Make sure the WebUI server is running.');
+        }
+    }
+
+    function handleWebSocketMessage(data) {
+        console.log('Received message:', data);
+
+        switch (data.type) {
+            case 'welcome':
+                sessionId = data.sessionId;
+                addActivity('system', `Session started: ${sessionId}`);
+                break;
+
+            case 'status':
+                updateStatus(data.status, data.operation);
+                break;
+
+            case 'task_started':
+                currentTaskId = data.taskId;
+                isProcessing = true;
+                addTask(data.taskId, data.task, 'running');
+                updateCurrentTask(data.task);
+                break;
+
+            case 'task_completed':
+                isProcessing = false;
+                updateTask(data.taskId, 'completed');
+                // Don't add activity here — final_answer already rendered it
+                updateStatus('ready', 'idle');
+                updateCurrentTask('Ready');
+                currentTaskId = null;
+                break;
+
+            case 'task_error':
+                isProcessing = false;
+                updateTask(data.taskId, 'error');
+                addActivity('error', `Task failed: ${data.error}`);
+                updateStatus('ready', 'idle');
+                updateCurrentTask('Ready');
+                currentTaskId = null;
+                break;
+
+            case 'task_cancelled':
+                isProcessing = false;
+                updateTask(data.taskId, 'cancelled');
+                addActivity('system', 'Task cancelled');
+                updateStatus('ready', 'idle');
+                updateCurrentTask('Ready');
+                currentTaskId = null;
+                break;
+
+            case 'activity':
+                handleActivityMessage(data);
+                break;
+
+            case 'progress':
+                break;
+
+            case 'error':
+                addActivity('error', data.error);
+                break;
+
+            case 'pong':
+                break;
+        }
+    }
+
+    function handleActivityMessage(data) {
+        switch (data.activity_type) {
+            case 'task_start':
+                addActivity('status', `Starting: ${data.content}`);
+                break;
+
+            case 'action': {
+                const icon = getToolIcon(data.action);
+                const params = getToolParams(data.action, data.action_input);
+                const el = addToolActivity(icon, data.action, params);
+                lastToolElement = el;
+                lastToolCompleted = false;
+                addTaskStep(data.taskId, icon, data.action);
+                break;
+            }
+
+            case 'thought':
+                addActivity('thought', data.content);
+                break;
+
+            case 'observation':
+                if (lastToolCompleted) {
+                    // tool_success/error already filled the result — skip duplicate
+                    lastToolCompleted = false;
+                } else if (lastToolElement) {
+                    // Attach result to the last tool element
+                    const resultDiv = lastToolElement.querySelector('.tool-result');
+                    if (resultDiv) {
+                        const isError = data.content && data.content.startsWith('Error:');
+                        resultDiv.textContent = '\u21B3 ' + truncate(data.content, 200);
+                        resultDiv.classList.add('visible', isError ? 'error' : 'success');
+                    }
+                    lastToolElement.classList.remove('tool-executing');
+                    lastToolElement.classList.add('tool-completed');
+                    lastToolElement = null;
+                } else {
+                    addActivity('status', data.content);
+                }
+                break;
+
+            case 'tool_execution':
+                // action already created the element — just update the reference
+                // (don't create a duplicate)
+                if (!lastToolElement) {
+                    // Fallback: if no action preceded this, create the element
+                    const icon = getToolIcon(data.tool);
+                    const params = getToolParams(data.tool, data.input);
+                    const el = addToolActivity(icon, data.tool, params);
+                    lastToolElement = el;
+                    lastToolCompleted = false;
+                    addTaskStep(data.taskId, icon, data.tool);
+                }
+                break;
+
+            case 'tool_success':
+                if (lastToolElement) {
+                    const resultDiv = lastToolElement.querySelector('.tool-result');
+                    if (resultDiv) {
+                        const timeStr = data.executionTime ? ` (${data.executionTime}ms)` : '';
+                        resultDiv.textContent = '\u21B3 completed' + timeStr;
+                        resultDiv.classList.add('visible', 'success');
+                    }
+                    lastToolElement.classList.remove('tool-executing');
+                    lastToolElement.classList.add('tool-completed');
+                    lastToolElement = null;
+                    lastToolCompleted = true;
+                }
+                break;
+
+            case 'tool_error':
+                if (lastToolElement) {
+                    const resultDiv = lastToolElement.querySelector('.tool-result');
+                    if (resultDiv) {
+                        resultDiv.textContent = '\u21B3 error: ' + truncate(data.error, 200);
+                        resultDiv.classList.add('visible', 'error');
+                    }
+                    lastToolElement.classList.remove('tool-executing');
+                    lastToolElement.classList.add('tool-completed');
+                    lastToolElement = null;
+                    lastToolCompleted = true;
+                }
+                break;
+
+            case 'final_answer':
+                addFinalAnswer(data.content);
+                break;
+
+            case 'parallel_start':
+                addActivity('status', `Starting parallel execution of ${data.count} tools`);
+                break;
+
+            case 'parallel_complete':
+                addActivity('status', `Parallel execution completed (${data.count} results)`);
+                break;
+
+            case 'context_compressed':
+                addActivity('system', 'Context compressed to manage memory');
+                break;
+        }
+    }
+
+    // Event listeners
+    document.getElementById('inputField').addEventListener('keypress', handleInput);
+
+    function handleInput(e) {
+        if (e.key === 'Enter' && !isProcessing && ws && ws.readyState === WebSocket.OPEN) {
+            const input = e.target.value.trim();
+            if (input) {
+                processCommand(input);
+                e.target.value = '';
+            }
+        }
+    }
+
+    function processCommand(command) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            addActivity('error', 'Not connected to server');
+            return;
+        }
+
+        addActivity('command', command);
+
+        ws.send(JSON.stringify({
+            type: 'execute_task',
+            task: command,
+            options: {
+                parallel: false,
+                maxIterations: 20,
+                saveSession: true
+            }
+        }));
+    }
+
+    function addTask(id, description, status) {
+        const task = {
+            id: id,
+            description: description,
+            status: status,
+            steps: [],
+            startTime: Date.now()
+        };
+
+        tasks.push(task);
+        updateTaskList();
+    }
+
+    function updateTask(id, status) {
+        const task = tasks.find(t => t.id === id);
+        if (task) {
+            task.status = status;
+            updateTaskList();
+        }
+    }
+
+    function addTaskStep(taskId, icon, toolName) {
+        const id = taskId || currentTaskId;
+        if (!id) return;
+        const task = tasks.find(t => t.id === id);
+        if (task) {
+            task.steps.push({ icon: icon, tool: toolName });
+            updateTaskList();
+        }
+    }
+
+    function addToolActivity(icon, toolName, params) {
+        const activityArea = document.getElementById('activityArea');
+        const item = document.createElement('div');
+        item.className = 'activity-item tool-executing';
+
+        const time = new Date().toLocaleTimeString('en-US', {hour12: false});
+        const paramStr = params ? ' ' + params : '';
+
+        item.innerHTML = `
+            <span class="activity-time">[${time}]</span>
+            <span class="activity-icon activity-tool">${icon}</span>
+            <div class="activity-content">
+                <span class="activity-tool">${toolName}${paramStr}</span>
+                <div class="tool-result"></div>
+            </div>
+        `;
+
+        activityArea.appendChild(item);
+        activityArea.scrollTop = activityArea.scrollHeight;
+        return item;
+    }
+
+    function addFinalAnswer(content) {
+        const activityArea = document.getElementById('activityArea');
+        const item = document.createElement('div');
+        item.className = 'activity-item';
+
+        const time = new Date().toLocaleTimeString('en-US', {hour12: false});
+
+        item.innerHTML = `
+            <span class="activity-time">[${time}]</span>
+            <span class="activity-icon" style="color: var(--accent-green);">\u2713</span>
+            <div class="activity-content">
+                <span class="final-answer-label">Final answer:</span>
+                <div class="final-answer-content">${escapeHtml(content)}</div>
+            </div>
+        `;
+
+        activityArea.appendChild(item);
+        activityArea.scrollTop = activityArea.scrollHeight;
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function addActivity(type, content) {
+        const activityArea = document.getElementById('activityArea');
+        const item = document.createElement('div');
+        item.className = 'activity-item';
+
+        const time = new Date().toLocaleTimeString('en-US', {hour12: false});
+        let icon, className, contentHtml;
+
+        switch (type) {
+            case 'command':
+                icon = '$';
+                className = 'activity-command';
+                contentHtml = escapeHtml(content);
+                break;
+            case 'status':
+                icon = '\u2713';
+                className = 'activity-status';
+                contentHtml = escapeHtml(content);
+                break;
+            case 'assistant':
+                icon = '\u25CF';
+                className = 'activity-assistant';
+                contentHtml = escapeHtml(content);
+                break;
+            case 'system':
+                icon = '!';
+                className = 'activity-status';
+                contentHtml = escapeHtml(content);
+                break;
+            case 'error':
+                icon = '\u2717';
+                className = 'activity-error';
+                contentHtml = escapeHtml(content);
+                break;
+            case 'thought':
+                icon = '\u25C8';
+                className = 'activity-thought';
+                contentHtml = escapeHtml(content);
+                break;
+        }
+
+        item.innerHTML = `
+            <span class="activity-time">[${time}]</span>
+            <span class="activity-icon ${className}">${icon}</span>
+            <div class="activity-content ${className}">${contentHtml}</div>
+        `;
+
+        activityArea.appendChild(item);
+        activityArea.scrollTop = activityArea.scrollHeight;
+    }
+
+    function updateStatus(status, operation) {
+        document.getElementById('operation').textContent = operation;
+        if (status === 'processing') {
+            document.getElementById('operation').classList.add('processing');
+        } else {
+            document.getElementById('operation').classList.remove('processing');
+        }
+    }
+
+    function updateCurrentTask(task) {
+        document.getElementById('currentTask').textContent = task;
+    }
+
+    function updateTaskList() {
+        const taskList = document.getElementById('taskList');
+        taskList.innerHTML = '';
+
+        let runningCount = 0;
+        let pendingCount = 0;
+
+        tasks.forEach((task, index) => {
+            const li = document.createElement('li');
+            li.className = 'task-item';
+
+            let icon, iconClass;
+            switch (task.status) {
+                case 'completed':
+                    icon = '\u2713';
+                    iconClass = 'task-completed';
+                    break;
+                case 'running':
+                    icon = '\u25B6';
+                    iconClass = 'task-running';
+                    runningCount++;
+                    break;
+                case 'pending':
+                    icon = '\u25CB';
+                    iconClass = 'task-pending';
+                    pendingCount++;
+                    break;
+                case 'error':
+                    icon = '\u2717';
+                    iconClass = 'task-error-status';
+                    break;
+                case 'cancelled':
+                    icon = '\u2212';
+                    iconClass = 'task-pending';
+                    break;
+                default:
+                    icon = '\u25CB';
+                    iconClass = 'task-pending';
+            }
+
+            const elapsed = task.startTime ? formatElapsed(task.startTime) : '';
+
+            // Build steps HTML
+            let stepsHtml = '';
+            if (task.steps.length > 0) {
+                const stepItems = task.steps.map(s =>
+                    `<li class="task-step"><span class="task-step-icon">${s.icon}</span>${s.tool}</li>`
+                ).join('');
+                stepsHtml = `<ul class="task-steps">${stepItems}</ul>`;
+            }
+
+            li.innerHTML = `
+                <div class="task-header">
+                    <span class="task-number">${index + 1}.</span>
+                    <span class="task-icon ${iconClass}">${icon}</span>
+                    <span class="task-description">${escapeHtml(truncate(task.description, 40))}</span>
+                    <span class="task-elapsed">${elapsed}</span>
+                </div>
+                ${stepsHtml}
+            `;
+
+            taskList.appendChild(li);
+        });
+
+        document.getElementById('runningCount').textContent = runningCount;
+        document.getElementById('pendingCount').textContent = pendingCount;
+    }
+
+    // Refresh elapsed times periodically
+    setInterval(() => {
+        if (tasks.some(t => t.status === 'running')) {
+            updateTaskList();
+        }
+    }, 1000);
+
+    // Keep connection alive with periodic ping
+    setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'ping' }));
+        }
+    }, 30000);
+</script>
+</body>
+</html>
