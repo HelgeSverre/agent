@@ -518,22 +518,6 @@ class Agent
         };
     }
 
-    protected function evaluateTaskCompletion(string $task)
-    {
-        $prompt = Prompt::make(
-            task: $task,
-            goal: $this->goal,
-            tools: $this->tools,
-            intermediateSteps: $this->intermediateSteps,
-            executionPlan: $this->executionPlan
-        )->evaluateTaskCompletion();
-
-        $response = LLM::json($prompt);
-        $this->hooks?->trigger('evaluation', $response);
-
-        return $response;
-    }
-
     protected function trimIntermediateSteps(): void
     {
         // Use ContextManager for intelligent context management

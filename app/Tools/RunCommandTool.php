@@ -55,7 +55,7 @@ class RunCommandTool extends Tool
         $safeCommands = [
             'ls', 'pwd', 'echo', 'cat', 'grep', 'find', 'wc', 'head', 'tail',
             'sort', 'uniq', 'cut', 'sed', 'awk', 'date', 'whoami', 'hostname',
-            'php', 'composer', 'git', 'npm', 'node', 'python', 'pip',
+            'composer', 'git',
         ];
 
         return in_array($command, $safeCommands);
