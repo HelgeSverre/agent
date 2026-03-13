@@ -41,11 +41,12 @@ abstract class Tool
                 $arguments = [];
 
                 foreach ($reflector->getParameters() as $param) {
+                    $type = $param->getType();
                     $arguments[] = new ToolArgument(
                         name: $param->getName(),
-                        type: $param->getType()->getName(),
+                        type: $type instanceof \ReflectionNamedType ? $type->getName() : 'string',
                         nullable: $param->allowsNull(),
-                        description: $param->getAttributes()[0]?->newInstance()->description
+                        description: ($param->getAttributes()[0] ?? null)?->newInstance()->description
                     );
                 }
 
@@ -111,7 +112,7 @@ abstract class Tool
 
             $arguments[] = new ToolArgument(
                 name: $param->getName(),
-                type: $param->getType()?->getName() ?? 'string',
+                type: ($type = $param->getType()) instanceof \ReflectionNamedType ? $type->getName() : 'string',
                 nullable: $param->allowsNull() || $param->isDefaultValueAvailable(),
                 description: $attribute?->newInstance()->description ?? null
             );
@@ -142,9 +143,9 @@ abstract class Tool
         // Validate required parameters first
         foreach ($args as $arg) {
             $value = $arguments[$arg->name] ?? null;
-            
+
             // Check if required parameter is missing
-            if (!$arg->nullable && ($value === null || $value === '')) {
+            if (! $arg->nullable && ($value === null || $value === '')) {
                 return "Error: Required parameter '{$arg->name}' is missing or empty for tool '{$this->name()}'";
             }
         }
@@ -172,7 +173,7 @@ abstract class Tool
         try {
             return call_user_func_array([$this, 'run'], $validArgs);
         } catch (Exception $e) {
-            return "Error executing tool '{$this->name()}': " . $e->getMessage();
+            return "Error executing tool '{$this->name()}': ".$e->getMessage();
         }
     }
 }

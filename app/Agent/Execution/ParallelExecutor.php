@@ -2,7 +2,6 @@
 
 namespace App\Agent\Execution;
 
-use Exception;
 use Symfony\Component\Process\Process;
 
 class ParallelExecutor
@@ -11,28 +10,28 @@ class ParallelExecutor
      * Maximum number of concurrent processes
      */
     protected int $maxProcesses;
-    
+
     /**
      * Default timeout per tool in seconds
      */
     protected int $defaultTimeout;
-    
+
     /**
      * Currently running processes
      */
     protected array $runningProcesses = [];
-    
+
     /**
      * Queue of pending tool calls
      */
     protected array $queue = [];
-    
+
     public function __construct(int $maxProcesses = 4, int $defaultTimeout = 30)
     {
         $this->maxProcesses = $maxProcesses;
         $this->defaultTimeout = $defaultTimeout;
     }
-    
+
     /**
      * Check if multiple tool calls can be parallelized
      */
@@ -42,13 +41,13 @@ class ParallelExecutor
         if (count($toolCalls) < 2) {
             return false;
         }
-        
+
         // Check if tools have dependencies on each other
         // For now, we assume all tools are independent
         // In future, we could analyze if one tool's output is needed by another
         return $this->hasNoDependencies($toolCalls);
     }
-    
+
     /**
      * Execute multiple tools in parallel
      */
@@ -57,21 +56,21 @@ class ParallelExecutor
         $results = [];
         $this->queue = $toolCalls;
         $this->runningProcesses = [];
-        
-        while (!empty($this->queue) || !empty($this->runningProcesses)) {
+
+        while (! empty($this->queue) || ! empty($this->runningProcesses)) {
             // Start new processes up to the limit
             $this->startProcesses();
-            
+
             // Check for completed processes
             $this->checkProcesses($results);
-            
+
             // Small sleep to prevent CPU spinning
             usleep(10000); // 10ms
         }
-        
+
         return $results;
     }
-    
+
     /**
      * Execute a single tool in an isolated process
      */
@@ -79,29 +78,29 @@ class ParallelExecutor
     {
         $process = $this->createProcess($toolCall);
         $process->run();
-        
+
         return $this->processResult($toolCall['id'], $process);
     }
-    
+
     /**
      * Start processes from queue up to max limit
      */
     protected function startProcesses(): void
     {
-        while (count($this->runningProcesses) < $this->maxProcesses && !empty($this->queue)) {
+        while (count($this->runningProcesses) < $this->maxProcesses && ! empty($this->queue)) {
             $toolCall = array_shift($this->queue);
-            
+
             $process = $this->createProcess($toolCall);
             $process->start();
-            
+
             $this->runningProcesses[$toolCall['id']] = [
                 'process' => $process,
                 'toolCall' => $toolCall,
-                'startTime' => microtime(true)
+                'startTime' => microtime(true),
             ];
         }
     }
-    
+
     /**
      * Check running processes for completion
      */
@@ -109,7 +108,7 @@ class ParallelExecutor
     {
         foreach ($this->runningProcesses as $id => $info) {
             $process = $info['process'];
-            
+
             // Check if process is still running
             if ($process->isRunning()) {
                 // Check for timeout
@@ -119,40 +118,41 @@ class ParallelExecutor
                     $results[$id] = [
                         'success' => false,
                         'error' => "Tool execution timed out after {$this->defaultTimeout} seconds",
-                        'tool' => $info['toolCall']['tool']
+                        'tool' => $info['toolCall']['tool'],
                     ];
                     unset($this->runningProcesses[$id]);
                 }
+
                 continue;
             }
-            
+
             // Process completed
             $results[$id] = $this->processResult($id, $process);
             unset($this->runningProcesses[$id]);
         }
     }
-    
+
     /**
      * Create a process for executing a tool
      */
     protected function createProcess(array $toolCall): Process
     {
         $args = base64_encode(json_encode($toolCall['arguments']));
-        
+
         $command = [
             PHP_BINARY,
             base_path('agent'),
             'agent:execute-tool',
-            '--tool=' . $toolCall['tool'],
-            '--args=' . $args
+            '--tool='.$toolCall['tool'],
+            '--args='.$args,
         ];
-        
+
         $process = new Process($command);
         $process->setTimeout($this->defaultTimeout);
-        
+
         return $process;
     }
-    
+
     /**
      * Process the result from a completed process
      */
@@ -160,24 +160,24 @@ class ParallelExecutor
     {
         $output = $process->getOutput();
         $exitCode = $process->getExitCode();
-        
+
         // Try to decode JSON output
         $decoded = json_decode($output, true);
-        
+
         if (json_last_error() === JSON_ERROR_NONE && isset($decoded['success'])) {
             return $decoded;
         }
-        
+
         // If not valid JSON or unexpected format, return error
         return [
             'success' => false,
-            'error' => $exitCode !== 0 
-                ? "Process failed with exit code {$exitCode}: " . $process->getErrorOutput()
-                : "Invalid output format: " . substr($output, 0, 200),
-            'tool' => $id
+            'error' => $exitCode !== 0
+                ? "Process failed with exit code {$exitCode}: ".$process->getErrorOutput()
+                : 'Invalid output format: '.substr($output, 0, 200),
+            'tool' => $id,
         ];
     }
-    
+
     /**
      * Check if tool calls have no dependencies
      * For now, this is a simple implementation
@@ -188,7 +188,7 @@ class ParallelExecutor
         // For now, assume all tools are independent
         return true;
     }
-    
+
     /**
      * Get maximum concurrent processes
      */
@@ -196,7 +196,7 @@ class ParallelExecutor
     {
         return $this->maxProcesses;
     }
-    
+
     /**
      * Set maximum concurrent processes
      */

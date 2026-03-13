@@ -3,6 +3,7 @@
 namespace App\Commands;
 
 use App\Agent\Agent;
+use App\Agent\Chat\FollowUpRecognizer;
 use App\Agent\Hooks;
 use App\Agent\LLM;
 use App\Agent\Planning\Planner;
@@ -23,14 +24,24 @@ class RunAgent extends Command
         {--resume= : Resume session by ID}
         {--parallel : Enable parallel tool execution}
         {--plan : Create and show execution plan before running}
-        {--chat : Enable conversational mode for continuous interaction}';
+        {--chat : Enable conversational mode for continuous interaction}
+        {--web : Start WebUI server mode}';
+
+    private ?FollowUpRecognizer $followUpRecognizer = null;
 
     public function handle(): void
     {
+        // Check if web mode is requested
+        if ($this->option('web')) {
+            $this->call('web');
+
+            return;
+        }
+
         $wrap = 120;
         $hooks = new Hooks;
         $agent = null;
-        
+
         // Define tools array
         $tools = [
             new ReadFileTool,
@@ -40,54 +51,56 @@ class RunAgent extends Command
             new RunCommandTool,
             new SpeakTool,
         ];
-        
+
         // Check for resume first
         if ($resumeId = $this->option('resume')) {
             $agent = Agent::fromSession($resumeId, $tools, $hooks);
-            
-            if (!$agent) {
+
+            if (! $agent) {
                 $this->error("Session not found: {$resumeId}");
+
                 return;
             }
-            
+
             $this->info("Resuming session: {$resumeId}");
             $task = 'Resuming previous task';
         } else {
             $task = $this->argument('task');
-            
-            if (!$task) {
+
+            if (! $task) {
                 $task = $this->ask('What do you want to do?');
             }
-            
+
             // Show parallel mode status
             if ($this->option('parallel')) {
                 $this->info('Parallel tool execution: ENABLED');
             }
         }
-        
+
         // Register all hooks before using them
         $this->registerHooks($hooks, $wrap);
-        
+
         // Handle planning if requested
         $executionPlan = null;
-        if ($this->option('plan') && !$this->option('resume')) {
-            $planner = new Planner();
+        if ($this->option('plan') && ! $this->option('resume')) {
+            $planner = new Planner;
             $this->info('Creating execution plan...');
             $executionPlan = $planner->createPlan($task, $tools);
-            
+
             // Trigger plan hook with raw plan data
             $hooks->trigger('plan', $executionPlan);
-            
+
             // Ask for confirmation
-            if (!$this->confirm('Do you want to proceed with this plan?')) {
+            if (! $this->confirm('Do you want to proceed with this plan?')) {
                 $this->info('Execution cancelled.');
+
                 return;
             }
             $this->newLine();
         }
 
         // Create agent if not resuming
-        if (!$agent) {
+        if (! $agent) {
             $agent = new Agent(
                 tools: $tools,
                 goal: 'Current date:'.date('Y-m-d')."\n".
@@ -97,19 +110,19 @@ class RunAgent extends Command
                 hooks: $hooks,
                 parallelEnabled: $this->option('parallel'),
             );
-            
+
             // Set execution plan if created
             if ($executionPlan) {
                 $agent->setExecutionPlan($executionPlan);
             }
-            
+
             // Enable session if requested
             if ($sessionId = $this->option('save-session')) {
-                if (!$sessionId || $sessionId === '1') {
+                if ($sessionId === true || $sessionId === '1') {
                     // Auto-generate ID from task
-                    $sessionId = Str::slug(Str::limit($task, 30)) . '-' . date('Y-m-d-His');
+                    $sessionId = Str::slug(Str::limit($task, 30)).'-'.date('Y-m-d-His');
                 }
-                
+
                 $agent->enableSession($sessionId);
                 $this->info("Session ID: {$sessionId}");
             }
@@ -127,51 +140,99 @@ class RunAgent extends Command
             }
         }
     }
-    
+
     protected function runChatMode(Agent $agent, string $initialTask): void
     {
         $this->info('◈ Chat mode enabled. Type "exit" or "quit" to end the conversation.');
         $this->newLine();
-        
+
+        // Initialize follow-up recognizer for chat mode
+        $this->followUpRecognizer = new FollowUpRecognizer;
+
         $task = $initialTask;
         $conversationActive = true;
-        
+        $conversationHistory = [];
+
         while ($conversationActive) {
             // Run the agent with current task
+            $startTime = microtime(true);
             $finalResponse = $agent->run($task);
-            
+            $processingTime = (microtime(true) - $startTime) * 1000;
+
+            // Update conversation context
+            if ($this->followUpRecognizer) {
+                $this->followUpRecognizer->updateContext($task, $finalResponse);
+            }
+
+            // Store conversation history for metrics
+            $conversationHistory[] = [
+                'input' => $task,
+                'response' => $finalResponse,
+                'processing_time' => $processingTime,
+            ];
+
             // Speak if enabled
             if ($this->option('speak')) {
                 shell_exec('say '.escapeshellarg(Str::of($finalResponse)->replace("\n", ' ')->trim()));
             }
-            
+
             // Visual separator
             $this->newLine();
-            $this->line('<fg=gray>' . str_repeat('─', 80) . '</>');
+            $this->line('<fg=gray>'.str_repeat('─', 80).'</>');
             $this->newLine();
-            
+
             // Get next input
             $nextInput = $this->ask('>');
-            
+
             if (in_array(strtolower($nextInput), ['exit', 'quit', 'bye', 'q'])) {
                 $this->info('◉ Ending chat session. Goodbye!');
+
+                // Show performance metrics
+                $this->showChatMetrics($conversationHistory);
                 $conversationActive = false;
             } else {
                 // Enhance task with context if it seems like a follow-up
-                $task = $this->enhanceTaskWithContext($nextInput, $finalResponse);
-                
+                $task = $this->enhanceTaskWithContext($nextInput, $finalResponse, $conversationHistory);
+
                 // Reset agent for next task but maintain context
                 $agent->resetForNextTask();
             }
         }
     }
-    
-    protected function enhanceTaskWithContext(string $input, string $previousResponse): string
+
+    protected function enhanceTaskWithContext(string $input, string $previousResponse, array $conversationHistory = []): string
+    {
+        if (! $this->followUpRecognizer) {
+            // Fallback to original method if recognizer not initialized
+            return $this->fallbackEnhanceTaskWithContext($input, $previousResponse);
+        }
+
+        // Use hybrid follow-up recognition system
+        $startTime = microtime(true);
+        $result = $this->followUpRecognizer->analyze($input, $previousResponse, $conversationHistory);
+        $processingTime = (microtime(true) - $startTime) * 1000;
+
+        // Show performance info in debug mode
+        if ($this->getOutput()->isVerbose()) {
+            $path = $result->getProcessingPath();
+            $confidence = round($result->getConfidence() * 100, 1);
+            $time = round($processingTime, 1);
+
+            $this->line("<fg=gray>Follow-up detection: {$path} path, {$confidence}% confidence, {$time}ms</>");
+        }
+
+        return $result->getEnhancedInput();
+    }
+
+    /**
+     * Fallback to original LLM-based enhancement
+     */
+    private function fallbackEnhanceTaskWithContext(string $input, string $previousResponse): string
     {
         // Use LLM to classify if this is a follow-up
-        $prompt = "Given the previous conversation and new input, determine if the new input is a follow-up question or a completely new task.
+        $prompt = 'Given the previous conversation and new input, determine if the new input is a follow-up question or a completely new task.
 
-Previous response summary: " . Str::limit($previousResponse, 200) . "
+Previous response summary: '.Str::limit($previousResponse, 200)."
 New input: {$input}
 
 Analyze this and return a JSON response with this structure:
@@ -184,15 +245,44 @@ Analyze this and return a JSON response with this structure:
 Be concise. If it's a follow-up, add minimal context in parentheses.";
 
         $result = LLM::json($prompt);
-        
+
         if ($result && isset($result['enhanced_input'])) {
             return $result['enhanced_input'];
         }
-        
+
         // Fallback if LLM fails
         return $input;
     }
-    
+
+    /**
+     * Show chat session performance metrics
+     */
+    private function showChatMetrics(array $conversationHistory): void
+    {
+        if (! $this->followUpRecognizer || empty($conversationHistory)) {
+            return;
+        }
+
+        $metrics = $this->followUpRecognizer->getMetrics();
+
+        if ($metrics['total_processed'] > 0) {
+            $this->newLine();
+            $this->line('<fg=cyan>◊</> <fg=white;options=bold>Chat Session Metrics</>');
+            $this->line('<fg=gray>'.str_repeat('─', 40).'</>');
+
+            $this->line("  <fg=gray>Total exchanges:</> <fg=white>{$metrics['total_processed']}</>");
+            $this->line("  <fg=gray>Pattern matches:</> <fg=green>{$metrics['pattern_matches']} ({$metrics['pattern_match_rate']}%)</>");
+            $this->line("  <fg=gray>Context matches:</> <fg=yellow>{$metrics['context_matches']} ({$metrics['context_match_rate']}%)</>");
+            $this->line("  <fg=gray>LLM fallbacks:</> <fg=red>{$metrics['llm_fallbacks']} ({$metrics['llm_fallback_rate']}%)</>");
+            $this->line("  <fg=gray>API call reduction:</> <fg=green>{$metrics['api_call_reduction']}%</>");
+
+            $avgTime = array_sum(array_column($conversationHistory, 'processing_time')) / count($conversationHistory);
+            $this->line('  <fg=gray>Avg response time:</> <fg=white>'.round($avgTime, 1).'ms</>');
+
+            $this->newLine();
+        }
+    }
+
     protected function registerHooks(Hooks $hooks, int $wrap): void
     {
         $hooks->on('start', function ($task) {
@@ -230,12 +320,12 @@ Be concise. If it's a follow-up, add minimal context in parentheses.";
                 }
             }
 
-            $this->line($icon . ' ' . $action['action'] . $params);
+            $this->line($icon.' '.$action['action'].$params);
         });
 
         $hooks->on('thought', function ($thought) {
             $wrapped = wordwrap($thought, 77, "\n   ");
-            $this->line('<fg=blue>◈</> <fg=gray>' . $wrapped . '</>');
+            $this->line('<fg=blue>◈</> <fg=gray>'.$wrapped.'</>');
         });
 
         $hooks->on('observation', function ($observation) {
@@ -244,54 +334,56 @@ Be concise. If it's a follow-up, add minimal context in parentheses.";
                 $lines = explode("\n", $observation);
                 $inResults = false;
                 foreach ($lines as $line) {
-                    if (empty(trim($line))) continue;
-                    
+                    if (empty(trim($line))) {
+                        continue;
+                    }
+
                     if (str_contains($line, '[Parallel Execution Complete]')) {
-                        $this->line('  <fg=magenta>◉</> <fg=white;options=bold>' . trim($line) . '</>');
+                        $this->line('  <fg=magenta>◉</> <fg=white;options=bold>'.trim($line).'</>');
                     } elseif (str_contains($line, 'Executed') && str_contains($line, 'tools:')) {
-                        $this->line('  <fg=gray>' . $line . '</>');
+                        $this->line('  <fg=gray>'.$line.'</>');
                     } elseif (str_starts_with(trim($line), '-')) {
-                        $this->line('    <fg=cyan>' . $line . '</>');
+                        $this->line('    <fg=cyan>'.$line.'</>');
                     } elseif (str_contains($line, 'Results:')) {
-                        $this->line('  <fg=gray>' . $line . '</>');
+                        $this->line('  <fg=gray>'.$line.'</>');
                         $inResults = true;
                     } elseif ($inResults && str_contains($line, '[✓')) {
                         // Successful result
-                        $this->line('    <fg=green>' . Str::limit($line, 120) . '</>');
+                        $this->line('    <fg=green>'.Str::limit($line, 120).'</>');
                     } elseif ($inResults && str_contains($line, '[✗')) {
                         // Failed result
-                        $this->line('    <fg=red>' . Str::limit($line, 120) . '</>');
+                        $this->line('    <fg=red>'.Str::limit($line, 120).'</>');
                     } elseif ($inResults) {
                         // Result content
-                        $this->line('    <fg=gray>' . Str::limit($line, 100) . '</>');
+                        $this->line('    <fg=gray>'.Str::limit($line, 100).'</>');
                     } else {
-                        $this->line('  <fg=gray>' . $line . '</>');
+                        $this->line('  <fg=gray>'.$line.'</>');
                     }
                 }
             } elseif (str_contains($observation, '[Parallel Queue]')) {
                 // Show queue messages
-                $this->line('  <fg=cyan>⟐</> ' . str_replace('[Parallel Queue] ', '', $observation));
+                $this->line('  <fg=cyan>⟐</> '.str_replace('[Parallel Queue] ', '', $observation));
             } elseif (str_contains($observation, '[Skipped]')) {
                 // Show skip messages
-                $this->line('  <fg=yellow>⟐</> ' . str_replace('[Skipped] ', '', $observation));
+                $this->line('  <fg=yellow>⟐</> '.str_replace('[Skipped] ', '', $observation));
             } else {
                 // Regular observations - properly indent multi-line content
                 $lines = explode("\n", $observation);
                 if (count($lines) > 1 || strlen($observation) > 77) {
-                    $this->line('   <fg=gray>↳ ' . array_shift($lines) . '</>');
+                    $this->line('   <fg=gray>↳ '.array_shift($lines).'</>');
                     foreach ($lines as $line) {
-                        if (!empty(trim($line))) {
-                            $this->line('     <fg=gray>' . Str::limit($line, 75) . '</>');
+                        if (! empty(trim($line))) {
+                            $this->line('     <fg=gray>'.Str::limit($line, 75).'</>');
                         }
                     }
                 } else {
-                    $this->line('   <fg=gray>↳ ' . $observation . '</>');
+                    $this->line('   <fg=gray>↳ '.$observation.'</>');
                 }
             }
         });
-        
+
         $hooks->on('compressed_context', function ($context) {
-            $this->line('<fg=yellow>◊</> <fg=gray>' . $context . '</>');
+            $this->line('<fg=yellow>◊</> <fg=gray>'.$context.'</>');
         });
 
         $hooks->on('evaluation', function ($eval) {
@@ -303,7 +395,7 @@ Be concise. If it's a follow-up, add minimal context in parentheses.";
                 $feedback = $eval['feedback'] ?? 'Completed';
                 $wrapped = wordwrap($feedback, 77, "\n   ");
                 $this->line('<fg=green>◉</> <fg=white;options=bold>Evaluation:</>');
-                $this->line('   <fg=green>' . $wrapped . '</>');
+                $this->line('   <fg=green>'.$wrapped.'</>');
             }
         });
 
@@ -313,74 +405,74 @@ Be concise. If it's a follow-up, add minimal context in parentheses.";
             $this->newLine();
         });
 
-        $hooks->on('final_answer', function ($finalAnswer) use ($wrap) {
+        $hooks->on('final_answer', function ($finalAnswer) {
             $this->newLine();
             $wrapped = wordwrap($finalAnswer, 77, "\n   ");
             $this->line('<fg=green>✓</> <fg=white;options=bold>Final answer:</>');
-            $this->line('   <fg=white>' . $wrapped . '</>');
+            $this->line('   <fg=white>'.$wrapped.'</>');
             $this->newLine();
         });
-        
+
         $hooks->on('parallel_execution_start', function ($count) {
             $this->line('<fg=magenta>⟐</> <fg=white;options=bold>Executing '.$count.' tools in parallel...</>');
         });
-        
+
         $hooks->on('parallel_execution_complete', function ($count) {
             $this->line('<fg=magenta>⟐</> <fg=green>Parallel execution complete ('.$count.' results)</>');
         });
-        
+
         $hooks->on('plan', function ($plan) {
             $this->newLine();
             $this->line('<fg=cyan>◍</> <fg=white;options=bold>Execution Plan</>');
-            $this->line('   <fg=gray>' . str_repeat('─', 60) . '</>');
-            
+            $this->line('   <fg=gray>'.str_repeat('─', 60).'</>');
+
             // Summary
             $wrapped = wordwrap($plan['summary'], 77, "\n   ");
-            $this->line('   <fg=white>' . $wrapped . '</>');
+            $this->line('   <fg=white>'.$wrapped.'</>');
             $this->newLine();
-            
+
             // Metadata
-            $complexityColor = match($plan['complexity']) {
+            $complexityColor = match ($plan['complexity']) {
                 'simple' => 'green',
                 'moderate' => 'yellow',
                 'complex' => 'red',
                 default => 'gray'
             };
-            
-            $this->line('   <fg=gray>Complexity:</> <fg=' . $complexityColor . ';options=bold>' . ucfirst($plan['complexity']) . '</>');
-            $this->line('   <fg=gray>Steps:</> <fg=white;options=bold>' . count($plan['steps']) . '</>');
-            $this->line('   <fg=gray>Estimated tools:</> <fg=white;options=bold>' . $plan['estimated_tools'] . '</>');
+
+            $this->line('   <fg=gray>Complexity:</> <fg='.$complexityColor.';options=bold>'.ucfirst($plan['complexity']).'</>');
+            $this->line('   <fg=gray>Steps:</> <fg=white;options=bold>'.count($plan['steps']).'</>');
+            $this->line('   <fg=gray>Estimated tools:</> <fg=white;options=bold>'.$plan['estimated_tools'].'</>');
             $this->newLine();
-            
+
             // Steps
             $this->line('   <fg=white;options=bold>Steps:</>');
-            $this->line('   <fg=gray>' . str_repeat('─', 60) . '</>');
-            
+            $this->line('   <fg=gray>'.str_repeat('─', 60).'</>');
+
             foreach ($plan['steps'] as $step) {
                 $this->newLine();
-                
+
                 // Step number and description
                 $stepDesc = wordwrap($step['description'], 70, "\n      ");
-                $this->line('   <fg=white;options=bold>' . $step['step_number'] . '.</> <fg=white>' . $stepDesc . '</>');
-                
+                $this->line('   <fg=white;options=bold>'.$step['step_number'].'.</> <fg=white>'.$stepDesc.'</>');
+
                 // Tools
-                if (!empty($step['tools'])) {
-                    $this->line('      <fg=blue>Tools: ' . implode(', ', $step['tools']) . '</>');
+                if (! empty($step['tools'])) {
+                    $this->line('      <fg=blue>Tools: '.implode(', ', $step['tools']).'</>');
                 }
-                
+
                 // Parallelization
                 if ($step['can_parallelize']) {
                     $this->line('      <fg=magenta>⟐ Can run in parallel</>');
                 }
-                
+
                 // Dependencies
-                if (!empty($step['depends_on'])) {
-                    $this->line('      <fg=gray>Depends on: Step ' . implode(', ', $step['depends_on']) . '</>');
+                if (! empty($step['depends_on'])) {
+                    $this->line('      <fg=gray>Depends on: Step '.implode(', ', $step['depends_on']).'</>');
                 }
             }
-            
+
             $this->newLine();
-            $this->line('   <fg=gray>' . str_repeat('─', 60) . '</>');
+            $this->line('   <fg=gray>'.str_repeat('─', 60).'</>');
             $this->newLine();
         });
     }

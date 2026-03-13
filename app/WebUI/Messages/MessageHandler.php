@@ -105,21 +105,27 @@ class MessageHandler
             $hooks = new Hooks;
             $this->setupAgentHooks($hooks, $connection, $handler, $taskId, $sessionId);
 
-            // Create agent
-            $agent = new Agent(
-                tools: $this->tools,
-                goal: 'Current date: '.date('Y-m-d')."\n".
-                    'Respond to the human as helpfully and accurately as possible. '.
-                    'The human will ask you to do things, and you should do them.',
-                maxIterations: $options['maxIterations'] ?? 20,
-                hooks: $hooks,
-                parallelEnabled: $options['parallel'] ?? false
-            );
+            // Try to restore agent from session to maintain conversation history
+            $agent = Agent::fromSession($sessionId, $this->tools, $hooks);
 
-            // Enable session if requested
-            if ($options['saveSession'] ?? false) {
-                $agent->enableSession($sessionId);
+            if ($agent) {
+                // Reset task-specific state but keep conversation history
+                $agent->resetForNextTask();
+            } else {
+                // Create fresh agent for new sessions
+                $agent = new Agent(
+                    tools: $this->tools,
+                    goal: 'Current date: '.date('Y-m-d')."\n".
+                        'Respond to the human as helpfully and accurately as possible. '.
+                        'The human will ask you to do things, and you should do them.',
+                    maxIterations: $options['maxIterations'] ?? 20,
+                    hooks: $hooks,
+                    parallelEnabled: $options['parallel'] ?? false
+                );
             }
+
+            // Always enable session persistence to maintain conversation memory
+            $agent->enableSession($sessionId);
 
             // Send status update
             $handler->sendToConnection($connection, [

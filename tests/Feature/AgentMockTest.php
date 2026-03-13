@@ -144,13 +144,17 @@ it('trims intermediate steps when they exceed limit', function () {
         maxIterations: 10
     );
 
-    // Use reflection to test trimming
+    // Use reflection to disable contextManager for testing simple trimming
     $reflection = new ReflectionClass($agent);
+    $contextManagerProperty = $reflection->getProperty('contextManager');
+    $contextManagerProperty->setAccessible(true);
+    $contextManagerProperty->setValue($agent, null);
+
     $recordMethod = $reflection->getMethod('recordStep');
     $recordMethod->setAccessible(true);
 
-    // Record more than 5 steps
-    for ($i = 1; $i <= 8; $i++) {
+    // Record more than maxIntermediateSteps (which is 10)
+    for ($i = 1; $i <= 15; $i++) {
         $recordMethod->invoke($agent, 'thought', "Thought number $i");
     }
 
@@ -159,14 +163,14 @@ it('trims intermediate steps when they exceed limit', function () {
     $trimMethod->setAccessible(true);
     $trimMethod->invoke($agent);
 
-    // Check that only last 5 steps remain
+    // Check that only last 10 steps remain
     $stepsProperty = $reflection->getProperty('intermediateSteps');
     $stepsProperty->setAccessible(true);
     $steps = $stepsProperty->getValue($agent);
 
-    expect($steps)->toHaveCount(5);
-    expect($steps[0]['content'])->toBe('Thought number 4');
-    expect($steps[4]['content'])->toBe('Thought number 8');
+    expect($steps)->toHaveCount(10);
+    expect($steps[0]['content'])->toBe('Thought number 6');
+    expect($steps[9]['content'])->toBe('Thought number 15');
 });
 
 it('respects max iterations limit', function () {

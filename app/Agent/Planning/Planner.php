@@ -10,38 +10,38 @@ class Planner
     /**
      * Create an execution plan for the given task
      *
-     * @param string $task The task to plan for
-     * @param array<Tool> $availableTools Available tools
+     * @param  string  $task  The task to plan for
+     * @param  array<Tool>  $availableTools  Available tools
      * @return array The execution plan
      */
     public function createPlan(string $task, array $availableTools): array
     {
         $prompt = $this->buildPlanningPrompt($task, $availableTools);
-        
+
         // Use LLM::json which already uses a lower temperature
         $response = LLM::json($prompt);
-        
+
         // Ensure we have a valid plan structure
-        if (!$response || !isset($response['steps']) || !is_array($response['steps'])) {
+        if (! $response || ! isset($response['steps']) || ! is_array($response['steps'])) {
             return $this->getDefaultPlan($task);
         }
-        
+
         return $response;
     }
-    
+
     /**
      * Build the planning prompt
      */
     private function buildPlanningPrompt(string $task, array $tools): string
     {
-        $toolList = array_map(fn(Tool $tool) => "- {$tool->name()}: {$tool->description()}", $tools);
-        
+        $toolList = array_map(fn (Tool $tool) => "- {$tool->name()}: {$tool->description()}", $tools);
+
         return "You are a task planner. Create a step-by-step execution plan for this task:
 
 TASK: {$task}
 
 AVAILABLE TOOLS:
-" . implode("\n", $toolList) . "
+".implode("\n", $toolList).'
 
 Create a detailed execution plan that:
 1. Breaks down the task into clear, actionable steps
@@ -52,18 +52,18 @@ Create a detailed execution plan that:
 
 Return a JSON response with this exact structure:
 {
-    \"summary\": \"Brief summary of the plan\",
-    \"steps\": [
+    "summary": "Brief summary of the plan",
+    "steps": [
         {
-            \"step_number\": 1,
-            \"description\": \"What this step will do\",
-            \"tools\": [\"tool_name\"],
-            \"can_parallelize\": false,
-            \"depends_on\": []
+            "step_number": 1,
+            "description": "What this step will do",
+            "tools": ["tool_name"],
+            "can_parallelize": false,
+            "depends_on": []
         }
     ],
-    \"estimated_tools\": 3,
-    \"complexity\": \"simple|moderate|complex\"
+    "estimated_tools": 3,
+    "complexity": "simple|moderate|complex"
 }
 
 Important:
@@ -72,9 +72,9 @@ Important:
 - Mark steps that could run in parallel with can_parallelize: true
 - Use depends_on to indicate step dependencies (array of step numbers)
 - Complexity should be: simple (1-2 tools), moderate (3-5 tools), or complex (6+ tools)
-- The summary should be concise but informative (1-2 sentences max)";
+- The summary should be concise but informative (1-2 sentences max)';
     }
-    
+
     /**
      * Get a default plan when planning fails
      */
@@ -88,12 +88,11 @@ Important:
                     'description' => 'Analyze and execute the requested task',
                     'tools' => [],
                     'can_parallelize' => false,
-                    'depends_on' => []
-                ]
+                    'depends_on' => [],
+                ],
             ],
             'estimated_tools' => 1,
-            'complexity' => 'simple'
+            'complexity' => 'simple',
         ];
     }
-    
 }

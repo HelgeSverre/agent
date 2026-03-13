@@ -19,33 +19,33 @@ class RunCommandTool extends Tool
     ): string {
         // Validate command is not empty
         if (empty(trim($command))) {
-            return "Error: Command cannot be empty. Please provide a valid command to execute.";
+            return 'Error: Command cannot be empty. Please provide a valid command to execute.';
         }
-        
+
         // Parse command properly - handle quoted arguments
         $commandParts = str_getcsv($command, ' ');
-        
+
         // Check if command exists
         $executable = $commandParts[0] ?? '';
-        if (!$this->isCommandSafe($executable)) {
+        if (! $this->isCommandSafe($executable)) {
             return "Error: Command '{$executable}' is not allowed for security reasons.";
         }
-        
+
         try {
             $process = new Process($commandParts);
             $process->setTimeout(30); // 30 second timeout
             $process->run();
-            
-            if (!$process->isSuccessful()) {
-                return "Error executing command: " . $process->getErrorOutput();
+
+            if (! $process->isSuccessful()) {
+                return 'Error executing command: '.$process->getErrorOutput();
             }
 
-            return $process->getOutput() ?: "Command executed successfully (no output)";
+            return $process->getOutput() ?: 'Command executed successfully (no output)';
         } catch (\Exception $e) {
-            return "Error: " . $e->getMessage();
+            return 'Error: '.$e->getMessage();
         }
     }
-    
+
     /**
      * Check if a command is safe to execute
      */
@@ -55,9 +55,9 @@ class RunCommandTool extends Tool
         $safeCommands = [
             'ls', 'pwd', 'echo', 'cat', 'grep', 'find', 'wc', 'head', 'tail',
             'sort', 'uniq', 'cut', 'sed', 'awk', 'date', 'whoami', 'hostname',
-            'php', 'composer', 'git', 'npm', 'node', 'python', 'pip'
+            'php', 'composer', 'git', 'npm', 'node', 'python', 'pip',
         ];
-        
+
         return in_array($command, $safeCommands);
     }
 }

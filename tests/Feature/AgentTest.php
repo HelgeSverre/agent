@@ -184,33 +184,43 @@ it('provides final answer when task is complete', function () {
 });
 
 it('respects max iterations limit', function () {
+    // This test verifies that the agent properly enforces max iterations limit
+    // We'll create a very low limit and give it a task that could take many iterations
+
     $hooks = new Hooks;
     $iterationCount = 0;
     $maxIterationReached = false;
 
-    $hooks->on('action', function () use (&$iterationCount) {
-        $iterationCount++;
+    $hooks->on('iteration', function ($iteration) use (&$iterationCount) {
+        $iterationCount = $iteration;
     });
 
     $hooks->on('max_iteration', function () use (&$maxIterationReached) {
         $maxIterationReached = true;
     });
 
+    // Create multiple files to search through
+    $outputDir = base_path('output/test');
+    for ($i = 1; $i <= 10; $i++) {
+        file_put_contents("$outputDir/file$i.txt", "Content of file $i");
+    }
+
     $agent = new Agent(
         tools: [
             new ReadFileTool(base_path('output/test')),
+            new WriteFileTool(base_path('output/test')),
         ],
         goal: 'Test iteration limits',
         hooks: $hooks,
-        maxIterations: 3
+        maxIterations: 2  // Very low limit
     );
 
-    // Give it an impossible task to force max iterations
-    $result = $agent->run('Read all files in the universe');
+    // Give it a task that would normally require many iterations
+    $result = $agent->run('Read each file from file1.txt to file10.txt and create a summary of all their contents in summary.txt');
 
     expect($maxIterationReached)->toBeTrue();
-    expect($iterationCount)->toBeLessThanOrEqual(3);
-    expect($result)->toContain('Max iterations reached');
+    expect($iterationCount)->toBe(3); // Should be 3 when max_iteration is triggered (2 + 1)
+    expect($result)->toContain('Max iterations reached: 2');
 });
 
 it('handles multiple tools correctly', function () {

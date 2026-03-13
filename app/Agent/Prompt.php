@@ -24,7 +24,7 @@ class Prompt
         ?array $intermediateSteps = [],
         ?array $executionPlan = null
     ): static {
-        return new self($task, $goal, $tools, $intermediateSteps, $executionPlan);
+        return new static($task, $goal, $tools, $intermediateSteps, $executionPlan);
     }
 
     protected function combine(array $parts): string
@@ -75,41 +75,43 @@ class Prompt
     {
         return implode("\n", [
             '## IMPORTANT GUIDELINES',
+            '- For simple questions or greetings, use the final_answer function immediately with your response',
+            '- Only use tools when they are necessary to complete the task',
             '- Break complex tasks into steps',
-            '- Use tools when appropriate',
             '- Provide clear, concise observations',
             '- Be specific with tool inputs',
-            '- When complete, use the final_answer function with your conclusion',
+            '- When the task is complete, ALWAYS use the final_answer function with your conclusion',
+            '- Do NOT call tools unnecessarily - if you can answer directly, use final_answer',
         ]);
     }
 
     protected function prepareExecutionPlan(): ?string
     {
-        if (!$this->executionPlan) {
+        if (! $this->executionPlan) {
             return null;
         }
-        
+
         $plan = "## EXECUTION PLAN\n";
         $plan .= "The following plan has been created for this task:\n\n";
         $plan .= "**Summary**: {$this->executionPlan['summary']}\n";
         $plan .= "**Complexity**: {$this->executionPlan['complexity']}\n\n";
         $plan .= "**Steps**:\n";
-        
+
         foreach ($this->executionPlan['steps'] as $step) {
             $plan .= "{$step['step_number']}. {$step['description']}\n";
-            if (!empty($step['tools'])) {
-                $plan .= "   - Tools: " . implode(', ', $step['tools']) . "\n";
+            if (! empty($step['tools'])) {
+                $plan .= '   - Tools: '.implode(', ', $step['tools'])."\n";
             }
             if ($step['can_parallelize']) {
                 $plan .= "   - Can run in parallel with other steps\n";
             }
         }
-        
+
         $plan .= "\nUse this plan as guidance, but adapt as needed based on actual results.";
-        
+
         return $plan;
     }
-    
+
     protected function prepareTools(): ?string
     {
         if (count($this->tools) == 0) {
@@ -146,6 +148,13 @@ class Prompt
         $context = ['## CONVERSATION HISTORY'];
 
         foreach ($this->intermediateSteps as $item) {
+            if ($item['type'] === 'previous_exchange') {
+                $context[] = "**User asked**: {$item['content']['task']}";
+                $context[] = "**You answered**: {$item['content']['answer']}";
+
+                continue;
+            }
+
             if ($item['type'] === 'thought') {
                 $context[] = "**Thought**: {$item['content']}";
 

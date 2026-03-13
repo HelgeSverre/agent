@@ -2,8 +2,6 @@
 
 namespace App\Agent\Session;
 
-use Carbon\Carbon;
-
 class AgentState
 {
     public function __construct(
@@ -17,7 +15,7 @@ class AgentState
     ) {
         $this->createdAt ??= now()->toIso8601String();
     }
-    
+
     public function toArray(): array
     {
         return [
@@ -31,7 +29,7 @@ class AgentState
             'updated_at' => now()->toIso8601String(),
         ];
     }
-    
+
     public static function fromArray(array $data): self
     {
         return new self(
