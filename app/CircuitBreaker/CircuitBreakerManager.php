@@ -63,19 +63,18 @@ class CircuitBreakerManager
     /**
      * Record execution result and update circuit breakers
      */
-    public function recordExecution(string $toolName, array $parameters, string $result): void
+    public function recordExecution(string $toolName, array $parameters, string $result, float $executionTime = 0.0): void
     {
         if (! $this->enabled) {
             return;
         }
 
-        $startTime = microtime(true);
         $success = ! str_starts_with($result, 'Error:');
 
         // Create execution record
         $record = $success
-            ? ToolExecutionRecord::success($toolName, $parameters, $result, microtime(true) - $startTime)
-            : ToolExecutionRecord::failure($toolName, $parameters, $result, microtime(true) - $startTime);
+            ? ToolExecutionRecord::success($toolName, $parameters, $result, $executionTime)
+            : ToolExecutionRecord::failure($toolName, $parameters, $result, $executionTime);
 
         // Add to history
         $this->executionHistory->addExecution($record);

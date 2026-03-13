@@ -40,8 +40,6 @@ class Agent
 
     protected ?ContextManager $contextManager = null;
 
-    protected array $consecutiveFailures = [];
-
     protected ?CircuitBreakerManager $circuitBreaker = null;
 
     /**
@@ -126,9 +124,6 @@ class Agent
         $this->pendingParallelTools = [];
         $this->parallelExecutionCount = 0;
 
-        // Clear consecutive failures for fresh start
-        $this->consecutiveFailures = [];
-
         // Reset circuit breaker for new task if configured
         if (config('circuit_breaker.development.reset_on_new_task', true)) {
             $this->circuitBreaker?->resetAll();
@@ -205,8 +200,9 @@ class Agent
         };
     }
 
-    public function run(string $task)
+    public function run(string $task): ?string
     {
+        $this->isTaskCompleted = false;
         $this->task = $task;
         $this->hooks?->trigger('start', $task);
 
@@ -320,14 +316,6 @@ class Agent
             return $message;
         }
 
-        // Legacy consecutive failures check (kept for backward compatibility)
-        $failureKey = $this->getToolExecutionKey($toolName, $toolInput);
-        $failureCount = $this->consecutiveFailures[$failureKey] ?? 0;
-
-        if ($failureCount >= 3) {
-            return "Error: Tool '{$toolName}' has failed 3 times with similar parameters. Please try a different approach or provide valid parameters.";
-        }
-
         $this->hooks?->trigger('tool_execution', $toolName, $toolInput);
         $startTime = microtime(true);
 
@@ -337,25 +325,13 @@ class Agent
 
             // Record execution in circuit breaker
             if ($this->circuitBreaker) {
-                $this->circuitBreaker->recordExecution($toolName, $toolInput, $result);
+                $this->circuitBreaker->recordExecution($toolName, $toolInput, $result, $executionTime);
             }
 
             // Check if the result indicates an error
             if (str_starts_with($result, 'Error:')) {
-                $this->consecutiveFailures[$failureKey] = $failureCount + 1;
-
-                // Add helpful context for the agent
-                if ($failureCount >= 1) {
-                    $result .= ' (Attempt '.($failureCount + 1).' of 3 before giving up)';
-                }
-
-                // Trigger circuit breaker hook for error
                 $this->hooks?->trigger('tool_execution_error', $toolName, $toolInput, $result, $executionTime);
             } else {
-                // Clear failure count on success
-                unset($this->consecutiveFailures[$failureKey]);
-
-                // Trigger circuit breaker hook for success
                 $this->hooks?->trigger('tool_execution_success', $toolName, $toolInput, $result, $executionTime);
             }
 
@@ -366,10 +342,9 @@ class Agent
 
             // Record execution failure in circuit breaker
             if ($this->circuitBreaker) {
-                $this->circuitBreaker->recordExecution($toolName, $toolInput, $errorResult);
+                $this->circuitBreaker->recordExecution($toolName, $toolInput, $errorResult, $executionTime);
             }
 
-            $this->consecutiveFailures[$failureKey] = $failureCount + 1;
             $this->hooks?->trigger('tool_execution_exception', $toolName, $toolInput, $e, $executionTime);
 
             return $errorResult;
