@@ -5,8 +5,6 @@ parameters:
     excludePaths:
         # Email tools depend on packages not always installed
         - app/Tools/EmailToolkit
-        # ContextManager references App\Agent\Brain which may not exist
-        - app/Agent/ContextManager.php
     treatPhpDocTypesAsCertain: false
     ignoreErrors:
         # Prompt::make() and Tool::fromClosure() return anonymous/concrete classes — safe in practice

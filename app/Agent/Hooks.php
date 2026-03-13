@@ -19,19 +19,8 @@ class Hooks
         return $this;
     }
 
-    public function onAny(Closure $callback): self
-    {
-        $this->listeners['*'] = $callback;
-
-        return $this;
-    }
-
     public function trigger(string $event, ...$args): void
     {
-        if (isset($this->listeners['*'])) {
-            ($this->listeners['*'])($event, ...$args);
-        }
-
         if (isset($this->listeners[$event])) {
             foreach ($this->listeners[$event] as $callback) {
                 $callback(...$args);
