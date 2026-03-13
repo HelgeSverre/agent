@@ -190,19 +190,19 @@ class WeatherTool extends Tool
     public function run(
         #[Description('The city to get weather for')]
         string $city,
-        
+
         #[Description('The country code (optional)')]
         ?string $country = null
     ): string {
         // Implementation to fetch weather data
         $location = $country ? "$city, $country" : $city;
-        
+
         // Call weather API...
         $weatherData = $this->fetchWeatherData($location);
-        
+
         return "The current weather in $location is: " . $weatherData;
     }
-    
+
     private function fetchWeatherData(string $location): string {
         // Actual API implementation...
         return "sunny, 25°C";
@@ -219,7 +219,7 @@ class WeatherTool extends Tool
 )]
 class DatabaseQueryTool extends Tool
 {
-    
+
     public function run(
         #[Description('The SQL query to execute (SELECT only)')]
         string $query
@@ -228,7 +228,7 @@ class DatabaseQueryTool extends Tool
         if (!str_starts_with(strtoupper(trim($query)), 'SELECT')) {
             return "Error: Only SELECT queries are allowed";
         }
-        
+
         // Execute query...
         return json_encode($results);
     }
@@ -251,14 +251,14 @@ class Agent
     {
         foreach ($this->tools as $tool) {
             $parameters = [];
-            
+
             foreach ($tool->arguments() as $arg) {
                 $parameters[$arg->name] = [
                     'type' => $this->mapPhpTypeToJsonSchema($arg->type),
                     'description' => $arg->description ?? '',
                 ];
             }
-            
+
             $this->toolsSchema[] = [
                 'name' => $tool->name(),
                 'description' => $tool->description(),
@@ -400,6 +400,7 @@ $result = $agent->run('Create a summary of recent tech news');
 ## Session Persistence
 
 The agent supports saving and resuming tasks across runs, allowing you to:
+
 - Interrupt long-running tasks and resume them later
 - Share agent sessions between team members
 - Debug agent behavior by inspecting saved states
@@ -428,6 +429,7 @@ php agent run --resume=php-research
 ### Session Storage
 
 Sessions are stored as JSON files in `storage/agent-sessions/`:
+
 - Each session includes the task, steps taken, and current state
 - Files are human-readable for debugging
 - Sessions persist across system restarts
@@ -495,6 +497,7 @@ $agent = new Agent(
 ### Visual Output
 
 When tools execute in parallel, you'll see:
+
 - ⟐ Cyan indicators for queuing and parallel operations
 - [✓] Green checkmarks for successful tool execution
 - [✗] Red X marks for failed tool execution

@@ -1,0 +1,28 @@
+parameters:
+    level: 5
+    paths:
+        - app
+    excludePaths:
+        # Email tools depend on packages not always installed
+        - app/Tools/EmailToolkit
+        # ContextManager references App\Agent\Brain which may not exist
+        - app/Agent/ContextManager.php
+    treatPhpDocTypesAsCertain: false
+    ignoreErrors:
+        # Prompt::make() and Tool::fromClosure() return anonymous/concrete classes — safe in practice
+        - identifier: new.static
+        - identifier: return.type
+          path: app/Agent/Tool/Tool.php
+        # Ratchet's ConnectionInterface doesn't declare $resourceId but IoConnection has it
+        - message: '#Access to an undefined property Ratchet\\ConnectionInterface::\$resourceId#'
+          paths:
+            - app/WebSocket/
+            - app/WebUI/
+        # ReactWebSocketServer uses a different ConnectionInterface than MessageHandler expects
+        - message: '#Parameter .* of method App\\WebUI\\Messages\\MessageHandler::handleMessage\(\) expects#'
+          path: app/WebUI/ReactWebSocketServer.php
+        - message: '#Parameter .* of method App\\WebUI\\Session\\WebUISessionManager::(createSession|getSessionId)\(\) expects#'
+          path: app/WebUI/ReactWebSocketServer.php
+        # TextUtils uses optional symfony/dom-crawler
+        - message: '#Symfony\\Component\\DomCrawler\\Crawler#'
+          path: app/TextUtils.php

@@ -1,184 +1,41 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# PHP Agent Framework
 
 ## Project Overview
 
-This is a PHP-based AI Agent Framework built with Laravel Zero v10.3. It enables building CLI applications that use
-OpenAI's function calling API to execute tasks through natural language commands.
+A PHP-based AI agent framework built with Laravel Zero. The agent uses an LLM to reason about tasks, select tools, and execute multi-step plans.
 
-## Key Commands
+## Project Structure
 
-### Development
+- `app/Agent/` - Core agent logic (Agent, Hooks, Prompt, Planning, Session, Context)
+- `app/Commands/` - CLI commands (`RunAgent`, `WebUIServer`, `ExecuteToolCommand`)
+- `app/Tools/` - Tool implementations (ReadFile, WriteFile, RunCommand, SearchWeb, etc.)
+- `app/WebSocket/` - WebSocket handler for agent interaction
+- `app/WebUI/` - WebUI handler with session management and message routing
+- `app/Http/` - HTTP/WebSocket hybrid handler
+- `tests/` - Test suite
 
-```bash
-# Install dependencies
-composer install
+## Commands
 
-# Run the agent with a task
-php agent run "your task description"
+- `php agent run "<task>"` - Run the agent with a task
+- `php agent web --port=8080` - Start the WebUI server
+- `php agent tool:execute <tool> <input>` - Execute a single tool
 
-# Run tests
-composer test
+## Testing
 
-# Format code (uses Laravel Pint)
-composer format
+- `vendor/bin/phpunit` - Run all tests
+- `vendor/bin/phpunit --filter=ClassName` - Run specific test
 
-# Build PHAR executable (if needed)
-box compile
-```
+## Code Style
 
-### Testing
+- PSR-12 coding standard
+- Type hints on parameters and return types
+- Files under 500 lines
+- Never hardcode secrets
 
-```bash
-# Run all tests
-composer test
+## Important Notes
 
-# Run specific test file
-vendor/bin/pest tests/Unit/Agent/AgentTest.php
-
-# Run with coverage
-vendor/bin/pest --coverage
-```
-
-## Architecture Overview
-
-### Core Components
-
-1. **Agent System** (`app/Agent/`)
-    - `Agent.php`: Main orchestrator that runs the ReAct loop, manages tools, and coordinates execution
-    - `LLM.php`: OpenAI API integration, handles function calling and JSON responses
-    - `Tool.php`: Abstract base class for all tools, uses reflection for parameter extraction
-    - `Hooks.php`: Event system for monitoring agent behavior and UI feedback
-
-2. **Tool Framework**
-    - Tools extend `Tool` abstract class
-    - Tool names must match pattern `^[a-zA-Z0-9_-]+$` (no spaces)
-    - Parameters are automatically extracted via reflection
-    - Use `#[Description]` attribute for parameter documentation
-    - File operations are restricted to the `output/` directory by default
-
-3. **Execution Flow**
-   ```
-   CLI Command → Agent::run() → Loop:
-     1. Agent asks LLM for next action
-     2. LLM selects tool and arguments
-     3. Tool executes and returns observation
-     4. Context updated with result
-     5. Check if task complete
-   → Final answer or max iterations
-   ```
-
-## Creating New Tools
-
-Tools must follow this pattern:
-
-```php
-<?php
-
-namespace App\Tools;
-
-use App\Agent\Tool\Tool;
-use App\Agent\Tool\Attributes\AsTool;
-use App\Agent\Tool\Attributes\Description;
-
-#[AsTool(
-    name: 'your_tool_name',  // Must match ^[a-zA-Z0-9_-]+$
-    description: 'What this tool does'
-)]
-class YourNewTool extends Tool
-{
-    public function run(
-        #[Description('Describe this parameter')]
-        string $requiredParam,
-        
-        #[Description('Optional parameter description')]
-        ?string $optionalParam = null
-    ): string {
-        // Tool implementation
-        // Return string observation for the agent
-        
-        return "Tool execution result";
-    }
-}
-```
-
-Then register in `RunAgent.php`:
-
-```php
-$tools = [
-    // ... existing tools
-    new YourNewTool(),
-];
-```
-
-## Important Conventions
-
-1. **Error Handling**: Tools should return error messages as strings rather than throwing exceptions when possible
-2. **File Paths**: Always validate file paths and use the configured base directory
-3. **Tool Naming**: Use snake_case for tool names, must match regex pattern ^[a-zA-Z0-9_-]+$
-4. **Type Safety**: Use PHP 8 type hints and nullable types appropriately
-5. **Attributes**: Use `#[AsTool]` for tool metadata and `#[Description]` for parameter documentation
-
-## Hook System
-
-The framework triggers these events during execution:
-
-- `start`: Task begins
-- `iteration`: Each loop iteration
-- `thought`: LLM reasoning process
-- `action`: Tool selection
-- `observation`: Tool output
-- `evaluation`: Task completion check
-- `final_answer`: Task completed
-- `max_iteration`: Hit iteration limit
-
-Use hooks in commands for UI feedback or monitoring.
-
-## Configuration
-
-Key environment variables:
-
-- `OPENAI_API_KEY`: Required for LLM access
-- `OPENAI_REQUEST_TIMEOUT`: API timeout (default: 30)
-- `BRAVE_API_KEY`: For web search functionality
-
-Configuration files in `config/`:
-
-- `openai.php`: Model settings and API configuration
-- `app.php`: Application settings
-- `imap.php`: Email integration settings
-
-## Common Patterns
-
-### Adding Web Capabilities
-
-The framework includes `SearchWebTool` and `BrowseWebsiteTool` using Brave Search API and web scraping.
-
-### File Operations
-
-`ReadFileTool` and `WriteFileTool` handle file I/O with path validation. Files are restricted to the `output/`
-directory.
-
-### External Commands
-
-`RunCommandTool` executes shell commands - use with caution and proper validation.
-
-### Email Integration
-
-Email tools in `app/Tools/EmailToolkit/` provide IMAP-based email functionality.
-
-## Testing Guidelines
-
-- Unit tests go in `tests/Unit/`
-- Feature tests go in `tests/Feature/`
-- Test tools by mocking the LLM responses
-- Use Pest PHP's describe/it syntax
-- Architecture tests in `tests/ArchTest.php` ensure code standards
-
-## Performance Considerations
-
-- The agent maintains conversation history but trims to last 5 steps for token efficiency
-- Each iteration makes an API call, so complex tasks may require multiple requests
-- Tools should return concise observations to minimize token usage
-- Default model is `gpt-4-mini` for cost efficiency
+- Do what has been asked; nothing more, nothing less.
+- NEVER create files unless they're absolutely necessary for achieving your goal.
+- ALWAYS prefer editing an existing file to creating a new one.
+- NEVER proactively create documentation files (\*.md) or README files. Only create documentation files if explicitly requested by the user.
+- Never save working files, text/mds and tests to the root folder.
