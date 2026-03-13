@@ -2,6 +2,7 @@
 
 namespace App\WebUI;
 
+use App\Agent\Session\SessionManager;
 use App\WebUI\Messages\MessageHandler;
 use App\WebUI\Session\WebUISessionManager;
 use Exception;
@@ -102,7 +103,7 @@ class WebSocketHandler implements MessageComponentInterface
         }
 
         // Check if agent session data exists on disk for this ID
-        $sessionManager = new \App\Agent\Session\SessionManager;
+        $sessionManager = new SessionManager;
         $existingData = $sessionManager->load($requestedSessionId);
 
         if ($existingData) {
