@@ -153,10 +153,10 @@ class ToolExecutionHistory
     {
         $cutoffTime = time() - $lookbackSeconds;
 
-        return array_filter(
+        return array_values(array_filter(
             $this->history,
             fn (ToolExecutionRecord $record) => $record->toolName === $toolName && $record->timestamp >= $cutoffTime
-        );
+        ));
     }
 
     /**
