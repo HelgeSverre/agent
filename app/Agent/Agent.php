@@ -367,7 +367,7 @@ class Agent
         // This prevents re-entering parallel mode for the same task
         $recentSteps = array_slice($this->intermediateSteps, -5);
         foreach ($recentSteps as $step) {
-            if ($step['type'] === 'observation' && str_contains($step['content'], '[Parallel Execution Complete]')) {
+            if ($step['type'] === 'observation' && is_string($step['content']) && str_contains($step['content'], '[Parallel Execution Complete]')) {
                 return false; // Already did parallel execution
             }
         }

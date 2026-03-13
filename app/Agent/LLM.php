@@ -25,7 +25,9 @@ class LLM
             ]);
 
             return self::toJson($response);
-        } catch (Throwable) {
+        } catch (Throwable $e) {
+            error_log('LLM::json error: ' . $e->getMessage());
+
             return null;
         }
     }

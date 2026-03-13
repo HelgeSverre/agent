@@ -99,6 +99,12 @@ class WebSocketHandler implements MessageComponentInterface
         $requestedSessionId = $data['sessionId'] ?? null;
 
         if (! $requestedSessionId) {
+            $this->sendToConnection($conn, [
+                'type' => 'session_resume_failed',
+                'reason' => 'No session ID provided',
+                'timestamp' => time(),
+            ]);
+
             return;
         }
 
@@ -114,6 +120,13 @@ class WebSocketHandler implements MessageComponentInterface
 
             $this->sendToConnection($conn, [
                 'type' => 'session_resumed',
+                'sessionId' => $requestedSessionId,
+                'timestamp' => time(),
+            ]);
+        } else {
+            $this->sendToConnection($conn, [
+                'type' => 'session_resume_failed',
+                'reason' => 'Session not found',
                 'sessionId' => $requestedSessionId,
                 'timestamp' => time(),
             ]);

@@ -71,6 +71,12 @@ class WebUISessionManager
         }
     }
 
+    /**
+     * Reassign a connection to a different session ID.
+     *
+     * Old WebUI session metadata (tasks, context) is intentionally discarded;
+     * the authoritative agent state lives in SessionManager on disk.
+     */
     public function reassignSession(ConnectionInterface $connection, string $newSessionId): void
     {
         $connectionId = spl_object_id($connection);
