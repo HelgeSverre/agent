@@ -405,7 +405,7 @@
     let reconnectAttempts = 0;
     let maxReconnectAttempts = 5;
     let reconnectDelay = 1000;
-    let sessionId = null;
+    let sessionId = localStorage.getItem('agent_session_id') || null;
     let currentTaskId = null;
 
     // State
@@ -480,6 +480,14 @@
                 console.log('WebSocket connected');
                 reconnectAttempts = 0;
                 addActivity('system', 'Connected to Agent server');
+
+                // Resume previous session if we have one stored
+                if (sessionId) {
+                    ws.send(JSON.stringify({
+                        type: 'resume_session',
+                        sessionId: sessionId
+                    }));
+                }
             };
 
             ws.onmessage = function(event) {
@@ -523,7 +531,14 @@
         switch (data.type) {
             case 'welcome':
                 sessionId = data.sessionId;
+                localStorage.setItem('agent_session_id', sessionId);
                 addActivity('system', `Session started: ${sessionId}`);
+                break;
+
+            case 'session_resumed':
+                sessionId = data.sessionId;
+                localStorage.setItem('agent_session_id', sessionId);
+                addActivity('system', `Session resumed: ${sessionId}`);
                 break;
 
             case 'status':

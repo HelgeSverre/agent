@@ -105,8 +105,11 @@ class MessageHandler
             $hooks = new Hooks;
             $this->setupAgentHooks($hooks, $connection, $handler, $taskId, $sessionId);
 
+            $maxIterations = $options['maxIterations'] ?? 20;
+            $parallelEnabled = $options['parallel'] ?? false;
+
             // Try to restore agent from session to maintain conversation history
-            $agent = Agent::fromSession($sessionId, $this->tools, $hooks);
+            $agent = Agent::fromSession($sessionId, $this->tools, $hooks, $maxIterations, $parallelEnabled);
 
             if ($agent) {
                 // Reset task-specific state but keep conversation history
@@ -118,9 +121,9 @@ class MessageHandler
                     goal: 'Current date: '.date('Y-m-d')."\n".
                         'Respond to the human as helpfully and accurately as possible. '.
                         'The human will ask you to do things, and you should do them.',
-                    maxIterations: $options['maxIterations'] ?? 20,
+                    maxIterations: $maxIterations,
                     hooks: $hooks,
-                    parallelEnabled: $options['parallel'] ?? false
+                    parallelEnabled: $parallelEnabled
                 );
             }
 

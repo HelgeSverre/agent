@@ -135,8 +135,13 @@ class Agent
         }
     }
 
-    public static function fromSession(string $sessionId, array $tools = [], ?Hooks $hooks = null): ?self
-    {
+    public static function fromSession(
+        string $sessionId,
+        array $tools = [],
+        ?Hooks $hooks = null,
+        int $maxIterations = 20,
+        bool $parallelEnabled = false
+    ): ?self {
         $manager = new SessionManager;
         $data = $manager->load($sessionId);
 
@@ -149,9 +154,9 @@ class Agent
         $agent = new self(
             tools: $tools,
             goal: $state->goal,
-            maxIterations: 10,
+            maxIterations: $maxIterations,
             hooks: $hooks,
-            parallelEnabled: config('app.parallel_execution.enabled', false)
+            parallelEnabled: $parallelEnabled
         );
 
         // Restore state
@@ -627,19 +632,7 @@ class Agent
             $this->hooks?->trigger('compressed_context', $content);
         }
 
-        // Auto-save if session enabled
-        if ($this->sessionId && $this->sessionManager) {
-            $state = new AgentState(
-                task: $this->task ?? '',
-                intermediateSteps: $this->intermediateSteps,
-                currentIteration: $this->currentIteration,
-                goal: $this->goal,
-                status: $this->isTaskCompleted ? 'completed' : 'running',
-                executionPlan: $this->executionPlan
-            );
-
-            $this->sessionManager->save($this->sessionId, $state->toArray());
-        }
+        $this->saveSessionState();
     }
 
     protected function saveSessionState(): void

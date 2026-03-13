@@ -71,6 +71,29 @@ class WebUISessionManager
         }
     }
 
+    public function reassignSession(ConnectionInterface $connection, string $newSessionId): void
+    {
+        $connectionId = spl_object_id($connection);
+        $oldSessionId = $this->connections[$connectionId] ?? null;
+
+        // Remove old session mapping
+        if ($oldSessionId && isset($this->sessions[$oldSessionId])) {
+            unset($this->sessions[$oldSessionId]);
+        }
+
+        // Create new session entry with the requested ID
+        $this->sessions[$newSessionId] = [
+            'id' => $newSessionId,
+            'connection_id' => $connectionId,
+            'created_at' => time(),
+            'last_activity' => time(),
+            'tasks' => [],
+            'context' => [],
+        ];
+
+        $this->connections[$connectionId] = $newSessionId;
+    }
+
     public function destroySession(ConnectionInterface $connection): void
     {
         $sessionId = $this->getSessionId($connection);

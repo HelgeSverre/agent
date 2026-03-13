@@ -66,6 +66,13 @@ class WebSocketHandler implements MessageComponentInterface
                 throw new Exception('Invalid JSON message');
             }
 
+            // Handle session resumption before requiring a session
+            if (($data['type'] ?? '') === 'resume_session') {
+                $this->handleResumeSession($from, $data);
+
+                return;
+            }
+
             $sessionId = $this->sessionManager->getSessionId($from);
             if (! $sessionId) {
                 throw new Exception('No session found for connection');
@@ -82,6 +89,32 @@ class WebSocketHandler implements MessageComponentInterface
                 'error' => $e->getMessage(),
                 'message' => $msg,
                 'connection' => $from->resourceId,
+            ]);
+        }
+    }
+
+    protected function handleResumeSession(ConnectionInterface $conn, array $data): void
+    {
+        $requestedSessionId = $data['sessionId'] ?? null;
+
+        if (! $requestedSessionId) {
+            return;
+        }
+
+        // Check if agent session data exists on disk for this ID
+        $sessionManager = new \App\Agent\Session\SessionManager;
+        $existingData = $sessionManager->load($requestedSessionId);
+
+        if ($existingData) {
+            // Adopt the requested session ID instead of the auto-generated one
+            $this->sessionManager->reassignSession($conn, $requestedSessionId);
+
+            $this->command->info("Session resumed ({$conn->resourceId}) - Session: {$requestedSessionId}");
+
+            $this->sendToConnection($conn, [
+                'type' => 'session_resumed',
+                'sessionId' => $requestedSessionId,
+                'timestamp' => time(),
             ]);
         }
     }
